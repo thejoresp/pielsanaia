@@ -15,3 +15,9 @@ export interface AnalysisIA {
   descripcion?: string;
   recomendaciones?: string[];
 }
+
+/** Respuesta de las recomendaciones del LLM (/skin/openai-recomendaciones). */
+export interface Recomendaciones {
+  descripcion?: string;
+  recomendaciones?: string[];
+}

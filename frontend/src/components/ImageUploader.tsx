@@ -3,15 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { Camera, Upload, X, Image as ImageIcon, CheckCircle } from 'lucide-react';
 import type { TipoAnalisis } from '../types/analysis';
 import { guardarAnalisis } from '../utils/analysisStorage';
+import { ApiError, ENDPOINTS, analizarImagen } from '../api/client';
 
 const MAX_IMAGE_MB = 5;
 
 // Endpoint del backend y ruta de resultados de cada tipo de análisis
 const ANALISIS: Record<TipoAnalisis, { endpoint: string; ruta: string }> = {
-  acne: { endpoint: '/skin/api/analyze-acne', ruta: '/results-acne' },
-  rosacea: { endpoint: '/skin/api/analyze-rosacea', ruta: '/results-rosacea' },
-  moles: { endpoint: '/skin/api/analyze-lunares', ruta: '/results-lunares' },
-  openai: { endpoint: '/skin/openai-analizar', ruta: '/results-openai' },
+  acne: { endpoint: ENDPOINTS.acne, ruta: '/results-acne' },
+  rosacea: { endpoint: ENDPOINTS.rosacea, ruta: '/results-rosacea' },
+  moles: { endpoint: ENDPOINTS.lunares, ruta: '/results-lunares' },
+  openai: { endpoint: ENDPOINTS.ia, ruta: '/results-openai' },
 };
 
 const mensajeDeError = (status: number): string => {
@@ -131,7 +132,6 @@ const ImageUploader: React.FC = () => {
   const [analysisType, setAnalysisType] = useState<TipoAnalisis | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -195,23 +195,14 @@ const ImageUploader: React.FC = () => {
     if (!selectedFile || !analysisType) return;
     setIsAnalyzing(true);
     const { endpoint, ruta } = ANALISIS[analysisType];
-    const formData = new FormData();
-    formData.append('file', selectedFile);
 
     try {
-      const response = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) {
-        alert(mensajeDeError(response.status));
-        return;
-      }
-      const data = await response.json();
+      const data = await analizarImagen<unknown>(endpoint, selectedFile);
       guardarAnalisis(analysisType, data);
       navigate(ruta, { state: { analysis: data } });
-    } catch {
-      alert(mensajeDeError(0));
+    } catch (err) {
+      // 0 = error de red (sin respuesta del servidor)
+      alert(mensajeDeError(err instanceof ApiError ? err.status : 0));
     } finally {
       setIsAnalyzing(false);
     }

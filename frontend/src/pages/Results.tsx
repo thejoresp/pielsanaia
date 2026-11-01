@@ -1,48 +1,46 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import type { Analysis } from '../types/analysis';
+import type { Analysis, TipoAnalisis } from '../types/analysis';
 import { leerAnalisis } from '../utils/analysisStorage';
-import { CONDITIONS } from '../data/conditions';
-import { ArrowLeft, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
+import { CONDITIONS, type ConditionId } from '../data/conditions';
+import { useRecommendations } from '../hooks/useRecommendations';
+import { ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 
+export type TipoLocal = Exclude<TipoAnalisis, 'openai'>;
 
-const ResultsAcne: React.FC = () => {
+// Lo único que cambia entre los resultados de los modelos locales.
+// Las clases de Tailwind van completas para que el JIT las detecte.
+const RESULTADOS: Record<TipoLocal, { condicion: ConditionId; iconoColor: string; cajaClases: string; textoClases: string }> = {
+  acne: {
+    condicion: 'acne',
+    iconoColor: 'text-pink-500',
+    cajaClases: 'bg-pink-100 dark:bg-pink-900/80 border border-pink-300 dark:border-pink-600',
+    textoClases: 'dark:text-pink-100',
+  },
+  rosacea: {
+    condicion: 'rosacea',
+    iconoColor: 'text-red-500',
+    cajaClases: 'bg-red-100 dark:bg-red-900/80 border border-red-300 dark:border-red-600',
+    textoClases: 'dark:text-red-100',
+  },
+  moles: {
+    condicion: 'lunares',
+    iconoColor: 'text-blue-500',
+    cajaClases: 'bg-blue-100 dark:bg-blue-900/80 border border-blue-300 dark:border-blue-600',
+    textoClases: 'dark:text-blue-100',
+  },
+};
+
+const Results: React.FC<{ tipo: TipoLocal }> = ({ tipo }) => {
   const location = useLocation();
   // useState fija el valor: leerAnalisis devuelve un objeto nuevo en cada render
   const [analysis] = useState<Analysis | null>(
-    () => (location.state?.analysis as Analysis | undefined) ?? leerAnalisis<Analysis>('acne')
+    () => (location.state?.analysis as Analysis | undefined) ?? leerAnalisis<Analysis>(tipo)
   );
-  const [recomendaciones, setRecomendaciones] = useState<string[]>([]);
-  const [loadingRec, setLoadingRec] = useState(false);
-  const [errorRec, setErrorRec] = useState(false);
-  const [descripcion, setDescripcion] = useState<string>("");
-  const API_URL = import.meta.env.VITE_API_URL;
-
-  useEffect(() => {
-    if (analysis?.prediccion) {
-      setLoadingRec(true);
-      setErrorRec(false);
-      fetch(`${API_URL}/skin/openai-recomendaciones`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prediccion: analysis.prediccion })
-      })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then(data => {
-          setRecomendaciones(data.recomendaciones || []);
-          setDescripcion(data.descripcion || "");
-        })
-        .catch(() => {
-          setRecomendaciones([]);
-          setDescripcion("");
-          setErrorRec(true);
-        })
-        .finally(() => setLoadingRec(false));
-    }
-  }, [analysis, API_URL]);
+  const { recomendaciones, descripcion, loading: loadingRec, error: errorRec } = useRecommendations(analysis?.prediccion);
+  const config = RESULTADOS[tipo];
+  const condicion = CONDITIONS[config.condicion];
+  const Icono = condicion.icon;
 
   if (!analysis) {
     return (
@@ -54,7 +52,7 @@ const ResultsAcne: React.FC = () => {
   }
 
   // Si el LLM no responde, se muestra la descripción educativa local
-  const textoDescripcion = descripcion || CONDITIONS.acne.description;
+  const textoDescripcion = descripcion || condicion.description;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 fade-in">
@@ -65,14 +63,14 @@ const ResultsAcne: React.FC = () => {
       <div className="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden">
         <div className="bg-blue-600 dark:bg-blue-700 py-6 px-6 rounded-t-lg shadow-xl border-2 border-blue-400 dark:border-blue-700">
           <div className="flex items-center space-x-4">
-            <AlertCircle className="h-10 w-10 text-pink-500" />
+            <Icono className={`h-10 w-10 ${config.iconoColor}`} />
             <h1 className="text-3xl font-bold text-white animate-fade-in">Afección detectada: {analysis.prediccion}</h1>
           </div>
         </div>
         <div className="p-6 bg-gray-50 dark:bg-gray-800">
           {textoDescripcion && (
-            <div className="mb-6 rounded-lg p-6 bg-pink-100 dark:bg-pink-900/80 border border-pink-300 dark:border-pink-600 shadow-lg animate-fade-in">
-              <p className="text-gray-700 dark:text-pink-100 text-base">{textoDescripcion}</p>
+            <div className={`mb-6 rounded-lg p-6 ${config.cajaClases} shadow-lg animate-fade-in`}>
+              <p className={`text-gray-700 ${config.textoClases} text-base`}>{textoDescripcion}</p>
             </div>
           )}
           {loadingRec && (
@@ -129,4 +127,4 @@ const ResultsAcne: React.FC = () => {
   );
 };
 
-export default ResultsAcne; 
+export default Results;

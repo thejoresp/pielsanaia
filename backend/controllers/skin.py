@@ -21,12 +21,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Las variables vacías (compose las pasa así si faltan en .env) cuentan como no definidas.
 # Límite de peticiones por IP para los endpoints que consumen el LLM (sintaxis de slowapi).
-RATE_LIMIT_IA = os.getenv("RATE_LIMIT_IA", "10/minute")
+RATE_LIMIT_IA = os.getenv("RATE_LIMIT_IA") or "10/minute"
 limiter = Limiter(key_func=get_remote_address)
 
 # Tamaño máximo de imagen aceptado (Caddy corta en 15 MB; acá se aplica el límite real).
-MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_MB", "5")) * 1024 * 1024
+MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_MB") or "5") * 1024 * 1024
 
 ERROR_ANALISIS = "No se pudo analizar la imagen. Intenta nuevamente."
 
@@ -80,7 +81,7 @@ async def api_analyze_rosacea(file: UploadFile = File(...)):
 
 
 # --- Cliente LLM (DeepSeek, API compatible con el SDK de OpenAI) ---
-LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-flash")
+LLM_MODEL = os.getenv("LLM_MODEL") or "deepseek-flash"
 _llm_client: AsyncOpenAI | None = None
 _aviso_sin_clave = False
 ERROR_IA = "Servicio de IA no disponible. Intenta nuevamente más tarde."
@@ -98,7 +99,7 @@ def _get_llm_client() -> AsyncOpenAI:
             raise HTTPException(status_code=503, detail=ERROR_IA)
         _llm_client = AsyncOpenAI(
             api_key=api_key,
-            base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
+            base_url=os.getenv("LLM_BASE_URL") or "https://api.deepseek.com",
             timeout=30,
             max_retries=1,
         )

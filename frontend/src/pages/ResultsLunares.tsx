@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import type { Analysis } from '../types/analysis';
 import { leerAnalisis } from '../utils/analysisStorage';
+import { CONDITIONS } from '../data/conditions';
 import { ArrowLeft, Crosshair, CheckCircle, AlertTriangle } from 'lucide-react';
 
-const lunaresDescription = 'Los lunares son áreas pequeñas de pigmentación en la piel. La mayoría son inofensivos, pero es importante monitorearlos y consultar con un dermatólogo si presentan cambios.';
 
 const ResultsLunares: React.FC = () => {
   const location = useLocation();
@@ -14,18 +14,23 @@ const ResultsLunares: React.FC = () => {
   );
   const [recomendaciones, setRecomendaciones] = useState<string[]>([]);
   const [loadingRec, setLoadingRec] = useState(false);
+  const [errorRec, setErrorRec] = useState(false);
   const [descripcion, setDescripcion] = useState<string>("");
   const API_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     if (analysis?.prediccion) {
       setLoadingRec(true);
+      setErrorRec(false);
       fetch(`${API_URL}/skin/openai-recomendaciones`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prediccion: analysis.prediccion })
       })
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
         .then(data => {
           setRecomendaciones(data.recomendaciones || []);
           setDescripcion(data.descripcion || "");
@@ -33,6 +38,7 @@ const ResultsLunares: React.FC = () => {
         .catch(() => {
           setRecomendaciones([]);
           setDescripcion("");
+          setErrorRec(true);
         })
         .finally(() => setLoadingRec(false));
     }
@@ -46,6 +52,9 @@ const ResultsLunares: React.FC = () => {
       </div>
     );
   }
+
+  // Si el LLM no responde, se muestra la descripción educativa local
+  const textoDescripcion = descripcion || CONDITIONS.lunares.description;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 fade-in">
@@ -61,10 +70,18 @@ const ResultsLunares: React.FC = () => {
           </div>
         </div>
         <div className="p-6 bg-gray-50 dark:bg-gray-800">
-          {descripcion && (
+          {textoDescripcion && (
             <div className="mb-6 rounded-lg p-6 bg-blue-100 dark:bg-blue-900/80 border border-blue-300 dark:border-blue-600 shadow-lg animate-fade-in">
-              <p className="text-gray-700 dark:text-blue-100 text-base">{descripcion}</p>
+              <p className="text-gray-700 dark:text-blue-100 text-base">{textoDescripcion}</p>
             </div>
+          )}
+          {loadingRec && (
+            <p className="mb-6 text-gray-600 dark:text-gray-300 animate-pulse">Generando recomendaciones…</p>
+          )}
+          {errorRec && (
+            <p className="mb-6 rounded px-3 py-2 text-sm bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100">
+              Servicio de IA no disponible: no se pudieron generar las recomendaciones. Intenta más tarde.
+            </p>
           )}
           {recomendaciones.length > 0 && (
             <div className="mb-8">

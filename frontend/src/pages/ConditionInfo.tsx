@@ -1,51 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-
-interface ConditionInfoType {
-  name: string;
-  title: string;
-  description: string;
-  causes: string[];
-  symptoms: string[];
-  treatment: string[];
-  prevention: string[];
-  image: string;
-}
+import { getCondition } from '../data/conditions';
 
 const ConditionInfo: React.FC = () => {
   const { condition } = useParams<{ condition: string }>();
-  const [data, setData] = useState<ConditionInfoType | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const data = getCondition(condition);
 
-  const API_URL = import.meta.env.VITE_API_URL;
-
-  useEffect(() => {
-    if (!condition) return;
-    setLoading(true);
-    setError(null);
-    fetch(`${API_URL}/skin/api/condition/${condition}`)
-      .then(res => {
-        if (!res.ok) throw new Error('No encontrada');
-        return res.json();
-      })
-      .then(setData)
-      .catch(() => setError('No se encontró información para esta condición.'))
-      .finally(() => setLoading(false));
-  }, [condition, API_URL]);
-  
-  if (loading) return <div className="text-center py-12">Cargando información...</div>;
-  if (error || !data) return (
-      <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 text-center">
-        <h2 className="text-2xl font-bold text-gray-900">Condición no encontrada</h2>
-      <p className="mt-2 text-gray-600">{error || 'La información sobre esta condición no está disponible.'}</p>
-        <Link to="/" className="mt-4 inline-flex items-center text-blue-600 hover:text-blue-800">
-          <ArrowLeft className="h-5 w-5 mr-1" />
-          Volver al inicio
-        </Link>
-      </div>
-    );
+  if (!data) return (
+    <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 text-center">
+      <h2 className="text-2xl font-bold text-gray-900">Condición no encontrada</h2>
+      <p className="mt-2 text-gray-600">La información sobre esta condición no está disponible.</p>
+      <Link to="/" className="mt-4 inline-flex items-center text-blue-600 hover:text-blue-800">
+        <ArrowLeft className="h-5 w-5 mr-1" />
+        Volver al inicio
+      </Link>
+    </div>
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6 lg:px-8">

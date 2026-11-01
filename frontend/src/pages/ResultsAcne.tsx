@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import type { Analysis } from '../types/analysis';
 import { leerAnalisis } from '../utils/analysisStorage';
+import { CONDITIONS } from '../data/conditions';
 import { ArrowLeft, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 
-const acneDescription = 'El acné es una enfermedad de la piel que ocurre cuando los folículos pilosos se tapan con grasa y células muertas de la piel. A menudo causa puntos blancos, puntos negros o granos, y suele aparecer en el rostro, la frente, el pecho, la parte superior de la espalda y los hombros.';
 
 const ResultsAcne: React.FC = () => {
   const location = useLocation();
@@ -14,18 +14,23 @@ const ResultsAcne: React.FC = () => {
   );
   const [recomendaciones, setRecomendaciones] = useState<string[]>([]);
   const [loadingRec, setLoadingRec] = useState(false);
+  const [errorRec, setErrorRec] = useState(false);
   const [descripcion, setDescripcion] = useState<string>("");
   const API_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     if (analysis?.prediccion) {
       setLoadingRec(true);
+      setErrorRec(false);
       fetch(`${API_URL}/skin/openai-recomendaciones`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prediccion: analysis.prediccion })
       })
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
         .then(data => {
           setRecomendaciones(data.recomendaciones || []);
           setDescripcion(data.descripcion || "");
@@ -33,6 +38,7 @@ const ResultsAcne: React.FC = () => {
         .catch(() => {
           setRecomendaciones([]);
           setDescripcion("");
+          setErrorRec(true);
         })
         .finally(() => setLoadingRec(false));
     }
@@ -46,6 +52,9 @@ const ResultsAcne: React.FC = () => {
       </div>
     );
   }
+
+  // Si el LLM no responde, se muestra la descripción educativa local
+  const textoDescripcion = descripcion || CONDITIONS.acne.description;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 fade-in">
@@ -61,10 +70,18 @@ const ResultsAcne: React.FC = () => {
           </div>
         </div>
         <div className="p-6 bg-gray-50 dark:bg-gray-800">
-          {descripcion && (
+          {textoDescripcion && (
             <div className="mb-6 rounded-lg p-6 bg-pink-100 dark:bg-pink-900/80 border border-pink-300 dark:border-pink-600 shadow-lg animate-fade-in">
-              <p className="text-gray-700 dark:text-pink-100 text-base">{descripcion}</p>
+              <p className="text-gray-700 dark:text-pink-100 text-base">{textoDescripcion}</p>
             </div>
+          )}
+          {loadingRec && (
+            <p className="mb-6 text-gray-600 dark:text-gray-300 animate-pulse">Generando recomendaciones…</p>
+          )}
+          {errorRec && (
+            <p className="mb-6 rounded px-3 py-2 text-sm bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100">
+              Servicio de IA no disponible: no se pudieron generar las recomendaciones. Intenta más tarde.
+            </p>
           )}
           {recomendaciones.length > 0 && (
             <div className="mb-8">

@@ -2,24 +2,25 @@ import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import type { AnalysisIA } from '../types/analysis';
 import { leerAnalisis } from '../utils/analysisStorage';
+import { CONDITIONS } from '../data/conditions';
 import { ArrowLeft, AlertTriangle, AlertCircle, Thermometer, Sun, Crosshair, CheckCircle } from 'lucide-react';
 
 const conditionMap: Record<string, { icon: JSX.Element; color: string; description: string }> = {
   'acné': {
     icon: <AlertCircle className="h-10 w-10 text-pink-500" />, color: 'bg-pink-100',
-    description: 'El acné es una condición común causada por la obstrucción de los folículos pilosos con grasa y células muertas.'
+    description: CONDITIONS.acne.summary
   },
   'rosácea': {
     icon: <Thermometer className="h-10 w-10 text-red-500" />, color: 'bg-red-100',
-    description: 'La rosácea es una afección crónica que causa enrojecimiento y vasos sanguíneos visibles en la cara.'
+    description: CONDITIONS.rosacea.summary
   },
   'mancha solar': {
     icon: <Sun className="h-10 w-10 text-yellow-500" />, color: 'bg-yellow-100',
-    description: 'Las manchas solares son áreas de la piel que se oscurecen debido a la exposición al sol.'
+    description: CONDITIONS.manchas.summary
   },
   'lunares': {
     icon: <Crosshair className="h-10 w-10 text-blue-500" />, color: 'bg-blue-100',
-    description: 'Los lunares son áreas pequeñas de pigmentación en la piel. La mayoría son inofensivos, pero es importante monitorearlos.'
+    description: CONDITIONS.lunares.summary
   }
 };
 

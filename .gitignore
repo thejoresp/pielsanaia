@@ -52,6 +52,3 @@ frontend/.env.cloud
 
 # Ignorar todos los archivos de modelo Keras
 *.keras
-
-# Token de ngrok
-ngrok_token.txt

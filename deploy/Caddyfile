@@ -1,0 +1,19 @@
+# Caddy obtiene y renueva automáticamente el certificado HTTPS (Let's Encrypt) para {$DOMAIN}
+{$DOMAIN} {
+	encode gzip
+
+	# API del backend (FastAPI)
+	handle /skin/* {
+		request_body {
+			max_size 15MB
+		}
+		reverse_proxy backend:8080
+	}
+
+	# Frontend (SPA con BrowserRouter: toda ruta desconocida vuelve a index.html)
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -1,0 +1,49 @@
+# PielSana IA - despliegue en VPS (Contabo + DuckDNS)
+# Uso: cp .env.example .env  (completar)  &&  docker compose up -d --build
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: pielsana-backend
+    env_file: .env
+    volumes:
+      # Los modelos .keras no van en la imagen: se suben a la VPS con scp
+      - ./backend/modelos:/app/backend/modelos
+    restart: unless-stopped
+    # Sin puertos públicos: solo accesible desde Caddy por la red interna
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+      args:
+        VITE_API_URL: https://${DOMAIN}
+    container_name: pielsana-web
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: pielsana-duckdns
+    environment:
+      SUBDOMAINS: ${DUCKDNS_SUBDOMAIN}
+      TOKEN: ${DUCKDNS_TOKEN}
+      TZ: America/Argentina/Buenos_Aires
+      LOG_FILE: "false"
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

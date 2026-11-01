@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import re
-import uuid
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -166,9 +165,6 @@ conditions_data = {
     ),
 }
 
-# Almacenamiento en memoria para resultados de lunares
-lunares_results = {}
-
 
 class PrediccionRequest(BaseModel):
     prediccion: str = Field(..., min_length=1, max_length=100)
@@ -227,20 +223,8 @@ async def api_analyze_skin(file: UploadFile = File(...)):
 
 @router.post("/api/analyze-lunares", tags=["Skin Analysis API"])
 async def api_analyze_lunares(file: UploadFile = File(...)):
-    """Endpoint API para analizar una imagen solo con el modelo lunares.keras."""
-    result = await _predecir(predict_lunares_class, file)
-    result_id = str(uuid.uuid4())
-    lunares_results[result_id] = result
-    return {"id": result_id}
-
-
-@router.get("/api/analyze-lunares/{result_id}", tags=["Skin Analysis API"])
-async def get_lunares_result(result_id: str):
-    """Obtener el resultado del análisis de lunares por ID."""
-    result = lunares_results.get(result_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Resultado no encontrado")
-    return result
+    """Analiza una imagen con el modelo de lunares (HAM10000) y devuelve el resultado directo."""
+    return await _predecir(predict_lunares_class, file)
 
 
 @router.get("/api/condition/{condition_name}", response_model=ConditionInfo, tags=["Skin Info"])

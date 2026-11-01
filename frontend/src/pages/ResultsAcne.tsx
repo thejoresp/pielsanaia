@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import type { Analysis } from '../types/analysis';
+import { leerAnalisis } from '../utils/analysisStorage';
 import { ArrowLeft, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const acneDescription = 'El acné es una enfermedad de la piel que ocurre cuando los folículos pilosos se tapan con grasa y células muertas de la piel. A menudo causa puntos blancos, puntos negros o granos, y suele aparecer en el rostro, la frente, el pecho, la parte superior de la espalda y los hombros.';
 
 const ResultsAcne: React.FC = () => {
   const location = useLocation();
-  const analysis = location.state?.analysis;
+  // useState fija el valor: leerAnalisis devuelve un objeto nuevo en cada render
+  const [analysis] = useState<Analysis | null>(
+    () => (location.state?.analysis as Analysis | undefined) ?? leerAnalisis<Analysis>('acne')
+  );
   const [recomendaciones, setRecomendaciones] = useState<string[]>([]);
   const [loadingRec, setLoadingRec] = useState(false);
   const [descripcion, setDescripcion] = useState<string>("");

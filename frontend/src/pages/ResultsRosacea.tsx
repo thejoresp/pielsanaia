@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import type { Analysis } from '../types/analysis';
+import { leerAnalisis } from '../utils/analysisStorage';
 import { ArrowLeft, Thermometer, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const rosaceaDescription = 'La rosácea es una afección crónica que causa enrojecimiento y vasos sanguíneos visibles en la cara. Puede producir brotes de enrojecimiento, granos y, en casos graves, engrosamiento de la piel.';
 
 const ResultsRosacea: React.FC = () => {
   const location = useLocation();
-  const analysis = location.state?.analysis;
+  // useState fija el valor: leerAnalisis devuelve un objeto nuevo en cada render
+  const [analysis] = useState<Analysis | null>(
+    () => (location.state?.analysis as Analysis | undefined) ?? leerAnalisis<Analysis>('rosacea')
+  );
   const [recomendaciones, setRecomendaciones] = useState<string[]>([]);
   const [loadingRec, setLoadingRec] = useState(false);
   const [descripcion, setDescripcion] = useState<string>("");

@@ -1,6 +1,26 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Camera, Upload, X, Image as ImageIcon, CheckCircle } from 'lucide-react';
+import type { TipoAnalisis } from '../types/analysis';
+import { guardarAnalisis } from '../utils/analysisStorage';
+
+const MAX_IMAGE_MB = 5;
+
+// Endpoint del backend y ruta de resultados de cada tipo de análisis
+const ANALISIS: Record<TipoAnalisis, { endpoint: string; ruta: string }> = {
+  acne: { endpoint: '/skin/api/analyze-acne', ruta: '/results-acne' },
+  rosacea: { endpoint: '/skin/api/analyze-rosacea', ruta: '/results-rosacea' },
+  moles: { endpoint: '/skin/api/analyze-lunares', ruta: '/results-lunares' },
+  openai: { endpoint: '/skin/openai-analizar', ruta: '/results-openai' },
+};
+
+const mensajeDeError = (status: number): string => {
+  if (status === 413) return `La imagen es demasiado grande (máximo ${MAX_IMAGE_MB} MB).`;
+  if (status === 429) return 'Hiciste demasiadas solicitudes. Espera un minuto e intenta de nuevo.';
+  if (status === 503) return 'El servicio de IA no está disponible en este momento. Intenta más tarde.';
+  if (status === 400) return 'El archivo debe ser una imagen.';
+  return 'Error al analizar la imagen. Intenta nuevamente.';
+};
 
 const ConsentModal: React.FC<{ onAccept: () => void; onClose: () => void }> = ({ onAccept, onClose }) => {
   const [checked, setChecked] = useState(false);
@@ -74,7 +94,7 @@ const ConsentModal: React.FC<{ onAccept: () => void; onClose: () => void }> = ({
   );
 };
 
-const analysisTypes = [
+const analysisTypes: { key: TipoAnalisis; label: string; image: string; description: string }[] = [
   {
     key: 'acne',
     label: 'Acné',
@@ -108,7 +128,7 @@ const ImageUploader: React.FC = () => {
   const [showConsent, setShowConsent] = useState(false);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [analysisType, setAnalysisType] = useState<string | null>(null);
+  const [analysisType, setAnalysisType] = useState<TipoAnalisis | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const API_URL = import.meta.env.VITE_API_URL;
@@ -122,29 +142,39 @@ const ImageUploader: React.FC = () => {
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      e.dataTransfer.clearData();
-    }
-  };
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-    if (!file.type.match('image.*')) {
+  // Valida y carga la imagen (la usan el input de archivo y el drag & drop)
+  const procesarArchivo = (file: File) => {
+    if (!file.type.startsWith('image/')) {
       alert('Por favor sube una imagen válida');
+      return;
+    }
+    if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      alert(`La imagen supera el máximo de ${MAX_IMAGE_MB} MB`);
       return;
     }
     setSelectedFile(file);
     const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target && typeof ev.target.result === 'string') {
-          setImage(ev.target.result);
+    reader.onload = (ev) => {
+      if (ev.target && typeof ev.target.result === 'string') {
+        setImage(ev.target.result);
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && analysisType && consentAccepted) {
+      procesarArchivo(file);
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      procesarArchivo(file);
     }
   };
 
@@ -162,48 +192,26 @@ const ImageUploader: React.FC = () => {
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !analysisType) return;
     setIsAnalyzing(true);
-    
-    console.log('Tipo de análisis seleccionado:', analysisType);
-  
+    const { endpoint, ruta } = ANALISIS[analysisType];
     const formData = new FormData();
     formData.append('file', selectedFile);
-  
+
     try {
-      let endpoint = `${API_URL}/skin/api/analyze`;
-      let isAcne = false;
-      let isRosacea = false;
-      let isOpenAI = false;
-      if (analysisType === 'moles') {
-        endpoint = `${API_URL}/skin/api/analyze-lunares`;
-      } else if (analysisType === 'acne') {
-        endpoint = `${API_URL}/skin/api/analyze-acne`;
-        isAcne = true;
-      } else if (analysisType === 'rosacea') {
-        endpoint = `${API_URL}/skin/api/analyze-rosacea`;
-        isRosacea = true;
-      } else if (analysisType === 'openai') {
-        endpoint = `${API_URL}/skin/openai-analizar`;
-        isOpenAI = true;
-      }
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         body: formData,
       });
-      if (!response.ok) throw new Error('Error en el análisis');
-      const data = await response.json();
-      if (isAcne) {
-        navigate(`/results-acne`, { state: { analysis: data } });
-      } else if (isRosacea) {
-        navigate(`/results-rosacea`, { state: { analysis: data } });
-      } else if (isOpenAI) {
-        navigate(`/results-openai`, { state: { analysis: data } });
-      } else {
-      navigate(`/results/${data.id || data.filename}`);
+      if (!response.ok) {
+        alert(mensajeDeError(response.status));
+        return;
       }
+      const data = await response.json();
+      guardarAnalisis(analysisType, data);
+      navigate(ruta, { state: { analysis: data } });
     } catch {
-      alert('Error al analizar la imagen');
+      alert(mensajeDeError(0));
     } finally {
       setIsAnalyzing(false);
     }
@@ -236,7 +244,6 @@ const ImageUploader: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setAnalysisType(type.key);
-                  console.log('Seleccionado:', type.key);
                   setShowConsent(true);
                   setConsentAccepted(false);
                 }}

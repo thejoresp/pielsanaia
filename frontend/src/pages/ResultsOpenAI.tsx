@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
+import type { AnalysisIA } from '../types/analysis';
+import { leerAnalisis } from '../utils/analysisStorage';
 import { ArrowLeft, AlertTriangle, AlertCircle, Thermometer, Sun, Crosshair, CheckCircle } from 'lucide-react';
 
 const conditionMap: Record<string, { icon: JSX.Element; color: string; description: string }> = {
@@ -23,7 +25,9 @@ const conditionMap: Record<string, { icon: JSX.Element; color: string; descripti
 
 const ResultsOpenAI: React.FC = () => {
   const location = useLocation();
-  const analysis = location.state?.analysis;
+  const [analysis] = useState<AnalysisIA | null>(
+    () => (location.state?.analysis as AnalysisIA | undefined) ?? leerAnalisis<AnalysisIA>('openai')
+  );
   const afeccion = analysis?.afeccion?.toLowerCase?.() || '';
   const condition = conditionMap[afeccion];
   const descripcion = analysis?.descripcion || condition?.description;

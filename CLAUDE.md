@@ -24,26 +24,33 @@ docker compose up -d --build          # .env en la raíz (plantilla .env.example
 
 ## Mapa del código
 - `backend/main.py`: crea la app, configura CORS (`ALLOWED_ORIGINS`) y monta `skin.router` en `/skin`.
-- `backend/controllers/skin.py`: todos los endpoints. Las llamadas al LLM pasan por `_llm_chat()`, que crea el cliente lazy y devuelve 503 si falla, y por `_parse_llm_json()`.
+- `backend/controllers/skin.py`: todos los endpoints. Las imágenes pasan por `_leer_imagen()` (tipo y `MAX_IMAGE_MB`) y la inferencia por `_predecir()` (en threadpool). Las llamadas al LLM usan `await _llm_chat()` (`AsyncOpenAI`, cliente lazy, 503 si falla) y `_parse_llm_json()`. `limiter` (slowapi) aplica `RATE_LIMIT_IA` a los endpoints de IA.
 - `backend/services/skin_analysis_service.py`: carga lazy de cada modelo y `predict_*_class(bytes) -> (label, probs)`.
 - `backend/config/model_config.py`: rutas de los `.keras`, que se pueden sobrescribir por env.
-- `frontend/src/components/ImageUploader.tsx`: selección del tipo de análisis → POST → `navigate` a `/results-*` con `location.state`.
+- `frontend/src/components/ImageUploader.tsx`: selección del tipo de análisis → POST (mapa `ANALISIS`) → `navigate` a `/results-*` con `location.state` y copia en `sessionStorage` (`utils/analysisStorage.ts`).
+- `frontend/src/data/conditions.ts`: contenido educativo de las condiciones (única fuente). Tipos de respuesta en `src/types/analysis.ts`.
 - `deploy/`: `Caddyfile`, `web.Dockerfile`, `setup-vps.sh`, `deploy.sh`.
 
 ## Decisiones y restricciones
-- **LLM = DeepSeek**, no OpenAI. No proponer gpt-4o. Variables: `DEEPSEEK_API_KEY` y, opcionales, `LLM_MODEL` y `LLM_BASE_URL`. Las rutas todavía se llaman `/skin/openai-*` por compatibilidad con el front; se renombran en la Fase 2.
+- **LLM = DeepSeek**, no OpenAI. No proponer gpt-4o. Variables: `DEEPSEEK_API_KEY` y, opcionales, `LLM_MODEL`, `LLM_BASE_URL`, `RATE_LIMIT_IA` y `MAX_IMAGE_MB`. Las rutas todavía se llaman `/skin/openai-*` por compatibilidad con el front; se renombran en la Fase 2.
 - **Nunca loguear secretos** ni el contenido completo de las respuestas del LLM.
 - Los modelos `.keras` **no se versionan ni entran en la imagen** (`.gitignore` y `.dockerignore`). Se suben con `scp` a `backend/modelos/{ham10000,acne,rosacea}/` y se montan como volumen.
 - El front y el back se sirven desde el mismo dominio. El build del front recibe `VITE_API_URL=https://${DOMAIN}`.
 - El prefijo `/skin` lo usa el `Caddyfile`. Si cambia, hay que actualizar los dos lados.
-- Errores hacia el cliente: mensajes genéricos. El detalle va a `logging`.
+- Errores hacia el cliente: mensajes genéricos. El detalle va a `logging` (no usar `print`).
+- Nada bloqueante dentro de `async def`: el LLM va con `await` y `model.predict` con `run_in_threadpool`.
+- Dependencias fijadas en `requirements.txt` según `pip freeze` en `python:3.10-slim`; al actualizarlas, resolver en esa imagen (varias libs nuevas ya exigen Python ≥3.11).
+- uvicorn corre con `--proxy-headers` para que el rate limit vea la IP real detrás de Caddy.
+- El build del front es `tsc -b && vite build`: un error de tipos rompe el Docker build.
 
 ## Hoja de ruta (ver `docs/AUDITORIA.md`)
 - [x] Fase 0: quitar el log de la API key y migrar a DeepSeek.
-- [ ] Fase 1: dejar el backend solo como API. Sacar el contenido de UI (`conditions_data`), las vistas HTML muertas y el store en memoria `lunares_results`. Endpoints `def`/async correctos y dependencias fijadas.
-- [ ] Fase 2: frontend como única fuente (`src/data/conditions.ts`, `src/api/client.ts`, un `Results.tsx` genérico) y arreglo del drag & drop.
+- [x] Hallazgos altos (A1–A8): dependencias fijadas, LLM async, rate limit, validación de imágenes, `lunares_results` eliminado, `conditions.ts` en el front, drag & drop, tsc/eslint en 0 y `setup-vps.sh`.
+- [ ] Fase 1 (resto): borrar las vistas muertas (`GET /skin/`, `/skin/results`, `POST /skin/upload`, `POST /skin/api/analyze`) y que `GET /` sea un health.
+- [ ] Fase 2 (resto): `src/api/client.ts` + `useRecommendations`, un `Results.tsx` genérico y renombrar las rutas `/skin/openai-*`.
 - [ ] Fase 3: limpieza (scripts de AWS/ngrok, `setup-lightshot.exe`, `.gitignore.bak`).
 
 ## Pendiente conocido
-- `backend/requirements.txt` fija `pydantic==1.10.15` y deja `fastapi` y `openai` sin versión, así que el build puede romperse.
-- Los endpoints de IA son públicos y no tienen rate limit (riesgo de costo).
+- Los endpoints de IA son públicos (con rate limit por IP). Falta el tope de gasto en el panel de DeepSeek (manual).
+- Si el LLM no responde, cada request espera hasta ~1 min (timeout 30 s + 1 reintento) antes del 503, pero ya no bloquea a los demás usuarios.
+- Pendientes medios/bajos en `docs/AUDITORIA.md` (compose: `env_file` completo, duckdns sin versión fija, sin healthcheck).

@@ -171,6 +171,8 @@ Plantilla en [`.env.example`](.env.example). Copiala a `.env` en la raíz (nunca
 | `LLM_MODEL` | Opcional. Modelo de DeepSeek | `deepseek-flash` (default) |
 | `LLM_BASE_URL` | Opcional. URL de la API compatible con OpenAI | `https://api.deepseek.com` (default) |
 | `ALLOWED_ORIGINS` | Orígenes CORS permitidos, separados por coma. Vacío = cualquiera | `https://pielsana.duckdns.org` |
+| `RATE_LIMIT_IA` | Opcional. Límite por IP de los endpoints de IA (sintaxis de slowapi) | `10/minute` (default) |
+| `MAX_IMAGE_MB` | Opcional. Tamaño máximo de imagen aceptado | `5` (default) |
 | `LUNARES_MODEL_PATH`, `ACNE_MODEL_PATH`, `ROSACEA_MODEL_PATH` | Opcional. Rutas alternativas a los modelos | — |
 
 Si falta `DEEPSEEK_API_KEY` o DeepSeek no responde, los endpoints de IA devuelven `503 Servicio de IA no disponible`. Los análisis con modelos locales siguen funcionando.
@@ -249,7 +251,7 @@ Toda la app (frontend + backend) corre en una VPS con Docker Compose, bajo `http
 docker compose ps                     # 3 servicios en "running"
 docker compose logs -f web            # emisión del certificado
 docker compose logs -f backend        # errores de la API / carga de modelos
-curl https://<sub>.duckdns.org/skin/api/condition/acne
+curl -I https://<sub>.duckdns.org/          # el front responde 200
 ```
 
 > Los puertos 80 y 443 tienen que estar libres y accesibles desde Internet para que Let's Encrypt emita el certificado.
@@ -264,13 +266,16 @@ Todas las rutas cuelgan de `/skin`. La documentación completa está en `/docs` 
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `POST` | `/skin/api/analyze-lunares` | Clasifica un lunar (multipart `file`). Devuelve `{id}`; el resultado se consulta con el GET de abajo |
-| `GET`  | `/skin/api/analyze-lunares/{id}` | Resultado del análisis de lunares |
+| `POST` | `/skin/api/analyze-lunares` | Clasifica un lunar (multipart `file`) |
 | `POST` | `/skin/api/analyze-acne` | Detecta acné (multipart `file`) |
 | `POST` | `/skin/api/analyze-rosacea` | Detecta rosácea (multipart `file`) |
 | `POST` | `/skin/openai-analizar` | Análisis directo de la imagen con DeepSeek (multipart `file`) |
 | `POST` | `/skin/openai-recomendaciones` | Descripción y recomendaciones con DeepSeek. Body: `{"prediccion": "Con acné"}` |
-| `GET`  | `/skin/api/condition/{nombre}` | Información de una condición (`acne`, `rosacea`, `manchas`, `lunares`) |
+
+- Las imágenes se validan en todos los endpoints: `400` si no es una imagen y `413` si supera `MAX_IMAGE_MB`.
+- Los dos endpoints de IA tienen rate limit por IP (`429` al superar `RATE_LIMIT_IA`); `prediccion` admite hasta 100 caracteres (`422`). Si DeepSeek no responde o falta la clave, devuelven `503`.
+- El contenido educativo de cada condición (causas, síntomas, tratamiento) vive en el front: `frontend/src/data/conditions.ts`.
+- **Tope de gasto:** además del rate limit, configurá un límite de gasto en el panel de DeepSeek.
 
 **Ejemplo — análisis de acné**
 

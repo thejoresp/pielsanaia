@@ -12,7 +12,7 @@ const ANALISIS: Record<TipoAnalisis, { endpoint: string; ruta: string }> = {
   acne: { endpoint: ENDPOINTS.acne, ruta: '/results-acne' },
   rosacea: { endpoint: ENDPOINTS.rosacea, ruta: '/results-rosacea' },
   moles: { endpoint: ENDPOINTS.lunares, ruta: '/results-lunares' },
-  openai: { endpoint: ENDPOINTS.ia, ruta: '/results-openai' },
+  ia: { endpoint: ENDPOINTS.ia, ruta: '/results-ia' },
 };
 
 const mensajeDeError = (status: number): string => {
@@ -115,7 +115,7 @@ const analysisTypes: { key: TipoAnalisis; label: string; image: string; descript
     description: 'Análisis de lunares y lesiones atípicas.',
   },
   {
-    key: 'openai',
+    key: 'ia',
     label: 'Detectar Condición',
     image: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&w=400',
     description: 'Analiza tu imagen con IA avanzada y detecta automáticamente el tipo de problema de piel.',

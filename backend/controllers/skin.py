@@ -20,7 +20,6 @@ from backend.services.skin_analysis_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-openai_router = APIRouter()
 
 # Límite de peticiones por IP para los endpoints que consumen el LLM (sintaxis de slowapi).
 RATE_LIMIT_IA = os.getenv("RATE_LIMIT_IA", "10/minute")
@@ -125,9 +124,9 @@ def _parse_llm_json(content: str):
     return json.loads(content)
 
 
-@openai_router.post("/openai-analizar")
+@router.post("/api/analyze-ia", tags=["Skin Analysis API"])
 @limiter.limit(RATE_LIMIT_IA)
-async def analizar_imagen_openai(request: Request, file: UploadFile = File(...)):
+async def analizar_imagen_ia(request: Request, file: UploadFile = File(...)):
     image_bytes = await _leer_imagen(file)
     image_base64 = base64.b64encode(image_bytes).decode("utf-8")
     image_data_url = f"data:{file.content_type};base64,{image_base64}"
@@ -156,9 +155,9 @@ async def analizar_imagen_openai(request: Request, file: UploadFile = File(...))
         }
 
 
-@openai_router.post("/openai-recomendaciones")
+@router.post("/api/recomendaciones", tags=["Skin Analysis API"])
 @limiter.limit(RATE_LIMIT_IA)
-async def obtener_recomendaciones_openai(request: Request, body: PrediccionRequest):
+async def obtener_recomendaciones(request: Request, body: PrediccionRequest):
     prompt = (
         f"Tengo un paciente con la siguiente condición dermatológica: '{body.prediccion}'. "
         "Dame una breve descripción educativa de la condición detectada y 5 recomendaciones para el paciente. "
@@ -173,6 +172,3 @@ async def obtener_recomendaciones_openai(request: Request, body: PrediccionReque
     except Exception:
         return {"descripcion": "No se pudo generar la descripción.", "recomendaciones": ["No se pudieron generar recomendaciones. Intenta nuevamente."]}
 
-
-# Registrar el router de IA en el router principal
-router.include_router(openai_router)

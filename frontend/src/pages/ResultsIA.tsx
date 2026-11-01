@@ -24,10 +24,10 @@ const conditionMap: Record<string, { icon: JSX.Element; color: string; descripti
   }
 };
 
-const ResultsOpenAI: React.FC = () => {
+const ResultsIA: React.FC = () => {
   const location = useLocation();
   const [analysis] = useState<AnalysisIA | null>(
-    () => (location.state?.analysis as AnalysisIA | undefined) ?? leerAnalisis<AnalysisIA>('openai')
+    () => (location.state?.analysis as AnalysisIA | undefined) ?? leerAnalisis<AnalysisIA>('ia')
   );
   const afeccion = analysis?.afeccion?.toLowerCase?.() || '';
   const condition = conditionMap[afeccion];
@@ -110,4 +110,4 @@ const ResultsOpenAI: React.FC = () => {
   );
 };
 
-export default ResultsOpenAI; 
+export default ResultsIA; 

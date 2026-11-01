@@ -6,7 +6,7 @@ import { CONDITIONS, type ConditionId } from '../data/conditions';
 import { useRecommendations } from '../hooks/useRecommendations';
 import { ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 
-export type TipoLocal = Exclude<TipoAnalisis, 'openai'>;
+export type TipoLocal = Exclude<TipoAnalisis, 'ia'>;
 
 // Lo único que cambia entre los resultados de los modelos locales.
 // Las clases de Tailwind van completas para que el JIT las detecte.

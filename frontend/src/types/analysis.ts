@@ -1,5 +1,5 @@
 /** Tipos de análisis que ofrece el uploader. */
-export type TipoAnalisis = 'acne' | 'rosacea' | 'moles' | 'openai';
+export type TipoAnalisis = 'acne' | 'rosacea' | 'moles' | 'ia';
 
 /** Respuesta de los modelos locales (/skin/api/analyze-*). */
 export interface Analysis {
@@ -9,14 +9,14 @@ export interface Analysis {
   probabilidades: Record<string, number>;
 }
 
-/** Respuesta del análisis con IA (/skin/openai-analizar). */
+/** Respuesta del análisis con IA (/skin/api/analyze-ia). */
 export interface AnalysisIA {
   afeccion?: string;
   descripcion?: string;
   recomendaciones?: string[];
 }
 
-/** Respuesta de las recomendaciones del LLM (/skin/openai-recomendaciones). */
+/** Respuesta de las recomendaciones del LLM (/skin/api/recomendaciones). */
 export interface Recomendaciones {
   descripcion?: string;
   recomendaciones?: string[];

@@ -4,7 +4,7 @@ import Home from './pages/Home';
 import Results from './pages/Results';
 import ConditionInfo from './pages/ConditionInfo';
 import About from './pages/About';
-import ResultsOpenAI from './pages/ResultsOpenAI';
+import ResultsIA from './pages/ResultsIA';
 
 function App() {
   return (
@@ -15,7 +15,7 @@ function App() {
         <Route path="results-lunares" element={<Results key="moles" tipo="moles" />} />
         <Route path="results-acne" element={<Results key="acne" tipo="acne" />} />
         <Route path="results-rosacea" element={<Results key="rosacea" tipo="rosacea" />} />
-        <Route path="results-openai" element={<ResultsOpenAI />} />
+        <Route path="results-ia" element={<ResultsIA />} />
         <Route path="conditions/:condition" element={<ConditionInfo />} />
         <Route path="about" element={<About />} />
       </Route>

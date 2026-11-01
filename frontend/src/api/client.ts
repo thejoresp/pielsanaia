@@ -7,8 +7,8 @@ export const ENDPOINTS = {
   acne: '/skin/api/analyze-acne',
   rosacea: '/skin/api/analyze-rosacea',
   lunares: '/skin/api/analyze-lunares',
-  ia: '/skin/openai-analizar',
-  recomendaciones: '/skin/openai-recomendaciones',
+  ia: '/skin/api/analyze-ia',
+  recomendaciones: '/skin/api/recomendaciones',
 } as const;
 
 /** Error HTTP del backend; `status` permite elegir el mensaje para el usuario. */

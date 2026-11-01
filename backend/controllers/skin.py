@@ -64,28 +64,6 @@ async def _predecir(predict_fn, file: UploadFile) -> dict:
     }
 
 
-@router.get("/")
-async def get_upload_page(request: Request):
-    """Sirve la página principal para cargar imágenes."""
-    raise HTTPException(status_code=404, detail="No implementado: la vista HTML es manejada por el frontend.")
-
-
-@router.post("/upload")
-async def handle_image_upload(file: UploadFile = File(...)):
-    return await _predecir(predict_lunares_class, file)
-
-
-@router.get("/results")
-async def get_results_page(request: Request, image_name: str = None, analysis_status: str = None):
-    """Sirve la página de resultados."""
-    raise HTTPException(status_code=404, detail="No implementado: la vista HTML es manejada por el frontend.")
-
-
-@router.post("/api/analyze", tags=["Skin Analysis API"])
-async def api_analyze_skin(file: UploadFile = File(...)):
-    return await _predecir(predict_lunares_class, file)
-
-
 @router.post("/api/analyze-lunares", tags=["Skin Analysis API"])
 async def api_analyze_lunares(file: UploadFile = File(...)):
     """Analiza una imagen con el modelo de lunares (HAM10000) y devuelve el resultado directo."""

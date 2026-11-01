@@ -5,7 +5,6 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -17,9 +16,6 @@ load_dotenv()
 
 # Logs de la app (los de uvicorn tienen su propia configuración)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-
-# Opcional: Verificar si el token se cargó (para depuración)
-# print(f"HF_TOKEN desde el entorno: {os.getenv('HF_TOKEN')}")
 
 # Crear la instancia de la aplicación FastAPI
 app = FastAPI(
@@ -42,19 +38,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#       "http://localhost:5173",            # Para desarrollo local
-#       "http://127.0.0.1:5173",
-#       "https://pielsana-ia.vercel.app",
-    
 
-# Endpoint de prueba
+# Health check (lo usa el healthcheck de compose; Caddy no lo expone: solo proxya /skin/*)
 @app.get("/")
-async def read_root():
-    # Redirigir a la página de carga de la aplicación de piel
-    return RedirectResponse(url="/skin/")
+async def health():
+    return {"status": "ok"}
 
 # Registrar routers de los controladores
-app.include_router(skin.router, prefix="/skin", tags=["Skin Analysis Frontend"])
+app.include_router(skin.router, prefix="/skin", tags=["Skin Analysis API"])
 
 if __name__ == "__main__":
     # Esta sección es útil para desarrollo, pero para producción usarás 'run.py'

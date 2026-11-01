@@ -1,27 +1,37 @@
-from fastapi import APIRouter, Request, File, UploadFile, HTTPException
-from fastapi.responses import RedirectResponse
-from pathlib import Path
-import asyncio
-import uuid
-import logging
-from openai import OpenAI
 import base64
+import json
+import logging
 import os
 import re
-import json
-from pydantic import BaseModel
+import uuid
 
-# Importar el servicio de análisis de piel
-from backend.services.skin_analysis_service import predict_lunares_class, predict_acne_class, predict_rosacea_class
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from backend.models.condition import ConditionInfo
+from backend.services.skin_analysis_service import (
+    predict_acne_class,
+    predict_lunares_class,
+    predict_rosacea_class,
+)
 
 logger = logging.getLogger(__name__)
 
-# Configurar el router
 router = APIRouter()
-
-# Crear un nuevo router para OpenAI
 openai_router = APIRouter()
+
+# Límite de peticiones por IP para los endpoints que consumen el LLM (sintaxis de slowapi).
+RATE_LIMIT_IA = os.getenv("RATE_LIMIT_IA", "10/minute")
+limiter = Limiter(key_func=get_remote_address)
+
+# Tamaño máximo de imagen aceptado (Caddy corta en 15 MB; acá se aplica el límite real).
+MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_MB", "5")) * 1024 * 1024
+
+ERROR_ANALISIS = "No se pudo analizar la imagen. Intenta nuevamente."
 
 # Diccionario de condiciones (temporal, normalmente iría en un archivo aparte)
 conditions_data = {
@@ -159,80 +169,70 @@ conditions_data = {
 # Almacenamiento en memoria para resultados de lunares
 lunares_results = {}
 
+
 class PrediccionRequest(BaseModel):
-    prediccion: str
+    prediccion: str = Field(..., min_length=1, max_length=100)
+
+
+async def _leer_imagen(file: UploadFile) -> bytes:
+    """Valida tipo y tamaño de la imagen subida y devuelve sus bytes."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen.")
+    image_bytes = await file.read(MAX_IMAGE_BYTES + 1)
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="La imagen supera el tamaño máximo permitido.")
+    return image_bytes
+
+
+async def _predecir(predict_fn, file: UploadFile) -> dict:
+    """Corre la inferencia del modelo local fuera del event loop."""
+    image_bytes = await _leer_imagen(file)
+    try:
+        pred_label, probabilities = await run_in_threadpool(predict_fn, image_bytes)
+    except Exception:
+        logger.exception("Error en la inferencia (%s)", predict_fn.__name__)
+        raise HTTPException(status_code=500, detail=ERROR_ANALISIS)
+    if pred_label is None:
+        logger.error("El modelo no devolvió predicción (%s)", predict_fn.__name__)
+        raise HTTPException(status_code=500, detail=ERROR_ANALISIS)
+    return {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "prediccion": pred_label,
+        "probabilidades": probabilities,
+    }
+
 
 @router.get("/")
 async def get_upload_page(request: Request):
     """Sirve la página principal para cargar imágenes."""
     raise HTTPException(status_code=404, detail="No implementado: la vista HTML es manejada por el frontend.")
 
+
 @router.post("/upload")
-async def handle_image_upload(request: Request, file: UploadFile = File(...)):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen.")
-    try:
-        image_bytes = await file.read()
-        pred_label, probabilities = predict_lunares_class(image_bytes)
-        if pred_label is not None:
-            print(f"Predicción para {file.filename}: {pred_label}")
-        else:
-            print(f"No se pudo predecir la clase para {file.filename}.")
-            raise HTTPException(status_code=500, detail="Error al procesar la imagen: No se pudo predecir la clase.")
-        return {"filename": file.filename, "prediccion": pred_label, "probabilidades": probabilities}
-    except HTTPException as http_exc:
-        raise http_exc
-    except Exception as e:
-        print(f"Error crítico al procesar la imagen: {e}")
-        raise HTTPException(status_code=500, detail=f"Error crítico al procesar la imagen: {str(e)}")
+async def handle_image_upload(file: UploadFile = File(...)):
+    return await _predecir(predict_lunares_class, file)
+
 
 @router.get("/results")
 async def get_results_page(request: Request, image_name: str = None, analysis_status: str = None):
     """Sirve la página de resultados."""
     raise HTTPException(status_code=404, detail="No implementado: la vista HTML es manejada por el frontend.")
 
+
 @router.post("/api/analyze", tags=["Skin Analysis API"])
 async def api_analyze_skin(file: UploadFile = File(...)):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen.")
-    try:
-        image_bytes = await file.read()
-        pred_label, probabilities = predict_lunares_class(image_bytes)
-        if pred_label is not None:
-            return {
-                "filename": file.filename,
-                "content_type": file.content_type,
-                "prediccion": pred_label,
-                "probabilidades": probabilities
-            }
-        else:
-            raise HTTPException(status_code=500, detail="No se pudo predecir la clase para la imagen.")
-    except Exception as e:
-        print(f"Error en API /api/analyze: {e}")
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor al analizar la imagen: {str(e)}")
+    return await _predecir(predict_lunares_class, file)
+
 
 @router.post("/api/analyze-lunares", tags=["Skin Analysis API"])
 async def api_analyze_lunares(file: UploadFile = File(...)):
     """Endpoint API para analizar una imagen solo con el modelo lunares.keras."""
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen.")
-    try:
-        image_bytes = await file.read()
-        pred_label, probabilities = predict_lunares_class(image_bytes)
-        if pred_label is not None:
-            result_id = str(uuid.uuid4())
-            lunares_results[result_id] = {
-                "filename": file.filename,
-                "content_type": file.content_type,
-                "prediccion": pred_label,
-                "probabilidades": probabilities
-            }
-            return {"id": result_id}
-        else:
-            raise HTTPException(status_code=500, detail="No se pudo predecir la clase para la imagen.")
-    except Exception as e:
-        print(f"Error en API /api/analyze-lunares: {e}")
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor al analizar la imagen: {str(e)}")
+    result = await _predecir(predict_lunares_class, file)
+    result_id = str(uuid.uuid4())
+    lunares_results[result_id] = result
+    return {"id": result_id}
+
 
 @router.get("/api/analyze-lunares/{result_id}", tags=["Skin Analysis API"])
 async def get_lunares_result(result_id: str):
@@ -242,6 +242,7 @@ async def get_lunares_result(result_id: str):
         raise HTTPException(status_code=404, detail="Resultado no encontrado")
     return result
 
+
 @router.get("/api/condition/{condition_name}", response_model=ConditionInfo, tags=["Skin Info"])
 async def get_condition_info(condition_name: str):
     condition = conditions_data.get(condition_name.lower())
@@ -249,79 +250,66 @@ async def get_condition_info(condition_name: str):
         raise HTTPException(status_code=404, detail="Condición no encontrada")
     return condition
 
+
 @router.post("/api/analyze-acne", tags=["Skin Analysis API"])
 async def api_analyze_acne(file: UploadFile = File(...)):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen.")
-    try:
-        image_bytes = await file.read()
-        pred_label, probabilities = predict_acne_class(image_bytes)
-        if pred_label is not None:
-            return {
-                "filename": file.filename,
-                "content_type": file.content_type,
-                "prediccion": pred_label,
-                "probabilidades": probabilities
-            }
-        else:
-            raise HTTPException(status_code=500, detail="No se pudo predecir la clase para la imagen.")
-    except Exception as e:
-        print(f"Error en API /api/analyze-acne: {e}")
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor al analizar la imagen: {str(e)}")
+    return await _predecir(predict_acne_class, file)
+
 
 @router.post("/api/analyze-rosacea", tags=["Skin Analysis API"])
 async def api_analyze_rosacea(file: UploadFile = File(...)):
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen.")
-    try:
-        image_bytes = await file.read()
-        pred_label, probabilities = predict_rosacea_class(image_bytes)
-        if pred_label is not None:
-            return {
-                "filename": file.filename,
-                "content_type": file.content_type,
-                "prediccion": pred_label,
-                "probabilidades": probabilities
-            }
-        else:
-            raise HTTPException(status_code=500, detail="No se pudo predecir la clase para la imagen.")
-    except Exception as e:
-        print(f"Error en API /api/analyze-rosacea: {e}")
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor al analizar la imagen: {str(e)}")
+    return await _predecir(predict_rosacea_class, file)
+
 
 # --- Cliente LLM (DeepSeek, API compatible con el SDK de OpenAI) ---
 LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-flash")
-_llm_client = None
+_llm_client: AsyncOpenAI | None = None
+_aviso_sin_clave = False
+ERROR_IA = "Servicio de IA no disponible. Intenta nuevamente más tarde."
 
-def _llm_chat(messages, max_tokens=500) -> str:
+
+def _get_llm_client() -> AsyncOpenAI:
+    """Crea el cliente lazy. Si falta la clave, avisa una sola vez y responde 503."""
+    global _llm_client, _aviso_sin_clave
+    if _llm_client is None:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        if not api_key:
+            if not _aviso_sin_clave:
+                logger.warning("DEEPSEEK_API_KEY no configurada: los endpoints de IA responden 503")
+                _aviso_sin_clave = True
+            raise HTTPException(status_code=503, detail=ERROR_IA)
+        _llm_client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
+            timeout=30,
+            max_retries=1,
+        )
+    return _llm_client
+
+
+async def _llm_chat(messages, max_tokens=500) -> str:
     """Envía un chat al LLM y devuelve el texto. Lanza 503 si el servicio no está disponible."""
-    global _llm_client
+    client = _get_llm_client()
     try:
-        if _llm_client is None:
-            api_key = os.getenv("DEEPSEEK_API_KEY")
-            if not api_key:
-                raise RuntimeError("DEEPSEEK_API_KEY no configurada")
-            _llm_client = OpenAI(
-                api_key=api_key,
-                base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
-                timeout=60,
-            )
-        response = _llm_client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=LLM_MODEL, messages=messages, max_tokens=max_tokens
         )
         return response.choices[0].message.content or ""
     except Exception:
         logger.exception("Error llamando al servicio de IA")
-        raise HTTPException(status_code=503, detail="Servicio de IA no disponible. Intenta nuevamente más tarde.")
+        raise HTTPException(status_code=503, detail=ERROR_IA)
+
 
 def _parse_llm_json(content: str):
     # Limpia los bloques de código si existen
     content = re.sub(r"^```json|^```|```$", "", content.strip(), flags=re.MULTILINE).strip()
     return json.loads(content)
 
+
 @openai_router.post("/openai-analizar")
-async def analizar_imagen_openai(file: UploadFile = File(...)):
-    image_bytes = await file.read()
+@limiter.limit(RATE_LIMIT_IA)
+async def analizar_imagen_openai(request: Request, file: UploadFile = File(...)):
+    image_bytes = await _leer_imagen(file)
     image_base64 = base64.b64encode(image_bytes).decode("utf-8")
     image_data_url = f"data:{file.content_type};base64,{image_base64}"
 
@@ -333,7 +321,7 @@ async def analizar_imagen_openai(file: UploadFile = File(...)):
         "Responde en formato JSON con los campos 'afeccion', 'descripcion' y 'recomendaciones' (lista de strings)."
     )
 
-    content = _llm_chat([
+    content = await _llm_chat([
         {"role": "system", "content": "Eres un dermatólogo experto."},
         {"role": "user", "content": [
             {"type": "text", "text": prompt},
@@ -348,14 +336,16 @@ async def analizar_imagen_openai(file: UploadFile = File(...)):
             "recomendaciones": ["Intenta con otra imagen o consulta a un dermatólogo."]
         }
 
+
 @openai_router.post("/openai-recomendaciones")
-async def obtener_recomendaciones_openai(request: PrediccionRequest):
+@limiter.limit(RATE_LIMIT_IA)
+async def obtener_recomendaciones_openai(request: Request, body: PrediccionRequest):
     prompt = (
-        f"Tengo un paciente con la siguiente condición dermatológica: '{request.prediccion}'. "
+        f"Tengo un paciente con la siguiente condición dermatológica: '{body.prediccion}'. "
         "Dame una breve descripción educativa de la condición detectada y 5 recomendaciones para el paciente. "
         "Responde en formato JSON con los campos 'descripcion' (string) y 'recomendaciones' (lista de strings)."
     )
-    content = _llm_chat([
+    content = await _llm_chat([
         {"role": "system", "content": "Eres un dermatólogo experto."},
         {"role": "user", "content": prompt}
     ])
@@ -363,6 +353,7 @@ async def obtener_recomendaciones_openai(request: PrediccionRequest):
         return _parse_llm_json(content)
     except Exception:
         return {"descripcion": "No se pudo generar la descripción.", "recomendaciones": ["No se pudieron generar recomendaciones. Intenta nuevamente."]}
+
 
 # Registrar el router de IA en el router principal
 router.include_router(openai_router)

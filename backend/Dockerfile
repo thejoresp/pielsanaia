@@ -20,4 +20,6 @@ COPY backend ./backend
 EXPOSE 8080
 
 # Comando para ejecutar la aplicación
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"] 
+# --proxy-headers: toma la IP real del cliente desde Caddy (necesario para el rate limit por IP).
+# Es seguro aceptar cualquier proxy porque el backend no publica puertos.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"] 

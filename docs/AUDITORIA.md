@@ -20,9 +20,10 @@
 - [x] **Bug:** el drag & drop no carga la imagen (`ImageUploader.tsx`, `handleDrop`). **Resuelto:** `procesarArchivo()` compartido por el input y el drop.
 
 ### 🟡 Medios
-- [ ] Vistas muertas: `GET /skin/`, `GET /skin/results`, `POST /skin/upload`, `POST /skin/api/analyze`, y `GET /`, que redirige a un 404.
-- [ ] `fetch` repartidos en 5 archivos → `src/api/client.ts` y un hook `useRecommendations`.
-- [ ] `ResultsAcne` y `ResultsRosacea` son casi idénticos → un `Results.tsx` genérico.
+- [x] Vistas muertas: `GET /skin/`, `GET /skin/results`, `POST /skin/upload`, `POST /skin/api/analyze`, y `GET /`, que redirige a un 404. **Resuelto:** borradas (404) y `GET /` responde `{"status": "ok"}`.
+- [x] `fetch` repartidos en 5 archivos → `src/api/client.ts` y un hook `useRecommendations`. **Resuelto:** el único `fetch` está en `client.ts`.
+- [x] `ResultsAcne` y `ResultsRosacea` son casi idénticos → un `Results.tsx` genérico. **Resuelto:** `Results.tsx` cubre acné, rosácea y lunares.
+- [x] Rutas `/skin/openai-*` con el nombre del proveedor viejo. **Resuelto:** `/skin/api/analyze-ia` y `/skin/api/recomendaciones` (front: tipo `ia`, `/results-ia`).
 - [x] `detail=str(e)` muestra el error interno al cliente en los `analyze-*`. **Resuelto:** 500 genérico + `logger.exception`.
 - [x] Llamadas bloqueantes (`model.predict`, LLM) dentro de `async def`. **Resuelto:** `AsyncOpenAI` + `run_in_threadpool`.
 
@@ -96,7 +97,17 @@ Se re-auditó corriendo herramientas en lugar de solo leer: `tsc --noEmit`, `esl
 | `GET /api/condition/acne`, `GET /api/analyze-lunares/x` | 404 (eliminados) | ✅ |
 
 ### Siguen pendientes
-Medios y bajos de §1 y §2: vistas muertas, `api/client.ts` y `Results.tsx` genérico, `env_file` completo en el backend, duckdns sin versión fija, healthcheck en compose, `DarkModeToggle.tsx` suelto y la limpieza de la Fase 3.
+Bajos de §1 y §2: `env_file` completo en el backend, duckdns sin versión fija, healthcheck en compose, `DarkModeToggle.tsx` suelto y la limpieza de la Fase 3.
+
+### Puntos medios (M1–M4) — pruebas detrás de Caddy
+| Caso | Esperado | Resultado |
+|---|---|---|
+| `GET /` del backend (desde el contenedor) | `{"status":"ok"}` | ✅ |
+| `POST /skin/api/recomendaciones` ×4 con `RATE_LIMIT_IA=3/minute`, sin clave | 503 ×3 y 429 | ✅ (1 warning, 0 tracebacks) |
+| `POST /skin/api/analyze-ia` con 6 MB | 413 | ✅ |
+| `/skin/openai-*`, `/skin/upload`, `/skin/api/analyze`, `GET /skin/`, `GET /skin/results` | 404 | ✅ |
+| `/results-{acne,rosacea,lunares,ia}` | 200 (SPA) | ✅ |
+| Bundle del front | solo rutas nuevas y clases de color de `Results.tsx` presentes | ✅ |
 
 ---
 ## 4. Re-auditoría de dependencias (2026-11-01) — para más adelante

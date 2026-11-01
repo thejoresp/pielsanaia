@@ -64,10 +64,8 @@ El LLM "traduce" esos datos técnicos en información útil y humana:
 Se usa de dos maneras:
 | Uso | Endpoint | Modelo |
 |-----|----------|--------|
-| Recomendaciones a partir de la predicción del modelo local | `POST /skin/openai-recomendaciones` | `deepseek-flash` (texto) |
-| Análisis directo de la imagen | `POST /skin/openai-analizar` | `deepseek-flash` (acepta imágenes) |
-
-> Los endpoints conservan el prefijo `openai-` por compatibilidad con el frontend; se renombrarán en la próxima etapa de refactor (ver [`docs/AUDITORIA.md`](docs/AUDITORIA.md)).
+| Recomendaciones a partir de la predicción del modelo local | `POST /skin/api/recomendaciones` | `deepseek-flash` (texto) |
+| Análisis directo de la imagen | `POST /skin/api/analyze-ia` | `deepseek-flash` (acepta imágenes) |
 
 ---
 
@@ -112,7 +110,9 @@ PielSanaIA-MVP/
 ├── frontend/                  ← React + Vite (SPA)
 │   ├── src/
 │   │   ├── components/        ← Navbar, ImageUploader, ConditionsOverview...
-│   │   ├── pages/             ← Home, About, ConditionInfo, Results*
+│   │   ├── api/client.ts      ← única puerta al backend (ENDPOINTS, ApiError)
+│   │   ├── hooks/             ← useRecommendations
+│   │   ├── pages/             ← Home, About, ConditionInfo, Results (acné/rosácea/lunares), ResultsIA
 │   │   └── main.tsx / App.tsx ← entrypoint y rutas
 │   ├── public/
 │   └── package.json
@@ -262,15 +262,15 @@ curl -I https://<sub>.duckdns.org/          # el front responde 200
 
 ## API
 
-Todas las rutas cuelgan de `/skin`. La documentación completa está en `/docs` (Swagger) del backend.
+Todas las rutas cuelgan de `/skin` (además, `GET /` del backend es un health interno que responde `{"status": "ok"}`; Caddy no lo expone). La documentación completa está en `/docs` (Swagger) del backend.
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `POST` | `/skin/api/analyze-lunares` | Clasifica un lunar (multipart `file`) |
 | `POST` | `/skin/api/analyze-acne` | Detecta acné (multipart `file`) |
 | `POST` | `/skin/api/analyze-rosacea` | Detecta rosácea (multipart `file`) |
-| `POST` | `/skin/openai-analizar` | Análisis directo de la imagen con DeepSeek (multipart `file`) |
-| `POST` | `/skin/openai-recomendaciones` | Descripción y recomendaciones con DeepSeek. Body: `{"prediccion": "Con acné"}` |
+| `POST` | `/skin/api/analyze-ia` | Análisis directo de la imagen con DeepSeek (multipart `file`) |
+| `POST` | `/skin/api/recomendaciones` | Descripción y recomendaciones con DeepSeek. Body: `{"prediccion": "Con acné"}` |
 
 - Las imágenes se validan en todos los endpoints: `400` si no es una imagen y `413` si supera `MAX_IMAGE_MB`.
 - Los dos endpoints de IA tienen rate limit por IP (`429` al superar `RATE_LIMIT_IA`); `prediccion` admite hasta 100 caracteres (`422`). Si DeepSeek no responde o falta la clave, devuelven `503`.
@@ -298,7 +298,7 @@ file: imagen.jpg
 **Ejemplo — recomendaciones con DeepSeek**
 
 ```bash
-curl -X POST https://<sub>.duckdns.org/skin/openai-recomendaciones \
+curl -X POST https://<sub>.duckdns.org/skin/api/recomendaciones \
   -H 'Content-Type: application/json' -d '{"prediccion":"Con acné"}'
 ```
 

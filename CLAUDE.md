@@ -53,4 +53,5 @@ docker compose up -d --build          # .env en la raíz (plantilla .env.example
 ## Pendiente conocido
 - Los endpoints de IA son públicos (con rate limit por IP). Falta el tope de gasto en el panel de DeepSeek (manual).
 - Si el LLM no responde, cada request espera hasta ~1 min (timeout 30 s + 1 reintento) antes del 503, pero ya no bloquea a los demás usuarios.
+- Vulnerabilidades de dependencias (Pillow → Python 3.11, Keras, npm) anotadas en `docs/AUDITORIA.md` §4, para después de los medios/bajos.
 - Pendientes medios/bajos en `docs/AUDITORIA.md` (compose: `env_file` completo, duckdns sin versión fija, sin healthcheck).

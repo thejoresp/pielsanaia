@@ -97,3 +97,14 @@ Se re-auditó corriendo herramientas en lugar de solo leer: `tsc --noEmit`, `esl
 
 ### Siguen pendientes
 Medios y bajos de §1 y §2: vistas muertas, `api/client.ts` y `Results.tsx` genérico, `env_file` completo en el backend, duckdns sin versión fija, healthcheck en compose, `DarkModeToggle.tsx` suelto y la limpieza de la Fase 3.
+
+---
+## 4. Re-auditoría de dependencias (2026-11-01) — para más adelante
+
+Las imágenes se construyeron con `docker build` y se probaron de punta a punta detrás de Caddy (413, 429, 503, IP real con `--proxy-headers` y un `X-Forwarded-For` falso que no saltea el límite). A1–A8 quedan verificados. Estos hallazgos se dejan para después de cerrar los medios y bajos de §1 y §2:
+
+- [ ] 🔴 **Pillow 12.3.0: 39 vulnerabilidades conocidas** (`pip-audit`). Se corrigen en 13.0.0, que exige Python ≥3.11 → pasar `backend/Dockerfile` a `python:3.11-slim` (TF 2.19 soporta 3.9–3.12), re-resolver `requirements.txt` con `pip freeze` en esa imagen y actualizar la nota de Python 3.10 en `CLAUDE.md`. Es el más urgente: Pillow abre las imágenes que suben los usuarios.
+- [ ] 🟠 **Keras 3.12.4: 4 vulnerabilidades**, corregidas en 3.15.0 (vía tensorflow/keras). Riesgo menor: solo se cargan `.keras` propios. Hacerlo junto con el cambio de Python.
+- [ ] 🟠 **npm audit: 24 vulnerabilidades (16 altas)**, todas con arreglo. Directas: `vite`, `postcss`, `react-router-dom` (esta última llega al build). Revisar saltos de versión mayor. GitHub (Dependabot) informa 53 alertas.
+- [ ] 🟢 **Carga lazy de modelos sin lock:** dos requests simultáneos en el threadpool pueden cargar el mismo `.keras` dos veces → `threading.Lock` en `load_*_model`.
+- [ ] 🟢 **Imagen del backend de 3,73 GB**, casi todo TensorFlow → evaluar `tensorflow-cpu`.

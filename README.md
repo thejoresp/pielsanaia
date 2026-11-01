@@ -13,62 +13,61 @@
 La piel es el órgano más grande de nuestro cuerpo y su salud es fundamental para nuestro bienestar físico y emocional. Sin embargo, muchas personas no tienen acceso fácil a un dermatólogo o a herramientas confiables para evaluar el estado de su piel.
 **PielSana IA** nace con la misión de acercar la tecnología de inteligencia artificial a la vida cotidiana, permitiendo que cualquier persona pueda analizar el estado de su piel de manera rápida, privada y sencilla, desde cualquier lugar.
 
-Nuestra plataforma ayuda a detectar y monitorear condiciones cutáneas frecuentes como el acné, la rosácea, las manchas solares y atípicas, la urticaria y las quemaduras. Así, buscamos empoderar a los usuarios para que tomen decisiones informadas sobre su salud y, si es necesario, consulten a un profesional con mayor información.
+Nuestra plataforma ayuda a detectar y monitorear condiciones cutáneas frecuentes como el acné, la rosácea, los lunares y las manchas solares. Así, buscamos empoderar a los usuarios para que tomen decisiones informadas sobre su salud y, si es necesario, consulten a un profesional con mayor información.
+
+> ⚠️ PielSana IA es una herramienta educativa y de apoyo. **No reemplaza el diagnóstico de un médico.**
+
+---
+
+## Tabla de Contenido
+
+- [¿Cómo funciona PielSana IA?](#cómo-funciona-pielsana-ia)
+- [Análisis inteligente con DeepSeek](#análisis-inteligente-con-deepseek-)
+- [Casos de Uso](#casos-de-uso)
+- [Características Técnicas](#características-técnicas)
+- [Estructura del Monorepo](#estructura-del-monorepo)
+- [Arquitectura](#arquitectura)
+- [Variables de entorno](#variables-de-entorno)
+- [Desarrollo local](#desarrollo-local)
+- [Despliegue en VPS (Contabo + DuckDNS)](#despliegue-en-vps-contabo--duckdns)
+- [API](#api)
+- [Modelos locales](#modelos-locales)
+- [FAQ](#faq---preguntas-frecuentes)
+- [Privacidad](#política-de-privacidad)
+- [Contribución, Licencia y Contacto](#contribución)
 
 ---
 
 ## ¿Cómo funciona PielSana IA?
 
-1. **Sube una foto de tu rostro o zona de interés** a través de una interfaz web simple y segura.
-2. **La imagen es analizada por un sistema de inteligencia artificial** que extrae información relevante sobre tu piel usando modelos locales.
-3. **Recibes un informe inmediato** sobre posibles condiciones cutáneas detectadas, que puedes usar como referencia para tu autocuidado o para consultar con un especialista.
+1. **Elegís el tipo de análisis** (lunares, acné, rosácea o análisis general con IA) y **subís una foto** de la zona de interés.
+2. **La imagen se analiza** con un modelo local de visión (CNN entrenada con Keras) o con el modelo multimodal de DeepSeek.
+3. **Recibís un informe inmediato** con la condición detectada, las probabilidades y recomendaciones generales de cuidado.
 
-> **Privacidad:** Tus imágenes se procesan de forma temporal y se eliminan tras el análisis. No almacenamos datos personales.
-
-> **Privacidad:** Tus imágenes se procesan de forma temporal y se eliminan tras el análisis. No almacenamos datos personales.
+> **Privacidad:** las imágenes se procesan en memoria y no se guardan. En el análisis con IA, la imagen se envía a la API de DeepSeek para procesarla.
 
 ---
 
-## Nueva Funcionalidad: Análisis Inteligente con OpenAI 🧠✨
+## Análisis inteligente con DeepSeek 🧠✨
 
-Hemos integrado la potencia de los **LLMs (Modelos de Lenguaje Grande)** a través de la API de OpenAI para enriquecer los resultados de nuestros modelos locales.
+Integramos un **LLM (Modelo de Lenguaje Grande)** a través de la API de [DeepSeek](https://api-docs.deepseek.com/) para enriquecer los resultados de los modelos locales.
 
-### ¿Por qué? (Why)
-Los modelos de clasificación de imágenes tradicionales son excelentes para detectar patrones visuales, pero su salida suele ser limitada: una etiqueta (ej. "Acné") y un porcentaje de confianza. Esto a menudo deja al usuario con dudas sobre qué significa realmente ese resultado o qué pasos seguir.
+### ¿Por qué?
+Los modelos de clasificación de imágenes detectan patrones visuales muy bien, pero su salida es limitada: una etiqueta (ej. "Con acné") y un porcentaje de confianza. Eso deja al usuario con dudas sobre qué significa el resultado o qué hacer.
 
-### ¿Para qué? (What for)
-La integración con OpenAI nos permite "traducir" esos datos técnicos en información útil y humana. Ahora, el sistema no solo te dice **qué** podrías tener, sino que también genera dinámicamente:
-- **Explicaciones Claras:** Detalla en lenguaje sencillo las características de la condición detectada.
-- **Contexto Educativo:** Provee información relevante sobre las causas y síntomas comunes.
-- **Recomendaciones Generales:** Ofrece consejos de cuidado personal y medidas preventivas (siempre recordando que NO sustituye a un médico).
+### ¿Para qué?
+El LLM "traduce" esos datos técnicos en información útil y humana:
+- **Explicaciones claras** de la condición detectada, en lenguaje sencillo.
+- **Contexto educativo** sobre causas y síntomas comunes.
+- **Recomendaciones generales** de cuidado y prevención (siempre recordando que NO sustituye a un médico).
 
-De esta forma, pasamos de una simple herramienta de detección a un **asistente de salud dermatológica** más completo y empático.
+Se usa de dos maneras:
+| Uso | Endpoint | Modelo |
+|-----|----------|--------|
+| Recomendaciones a partir de la predicción del modelo local | `POST /skin/openai-recomendaciones` | `deepseek-flash` (texto) |
+| Análisis directo de la imagen | `POST /skin/openai-analizar` | `deepseek-flash` (acepta imágenes) |
 
----
-
-## Estructura del Monorepo
-
-```
-Integrador/
-├── frontend/               ← React + Vite
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   ├── vite.config.js
-│   └── ...
-├── backend/                ← FastAPI y modelos locales
-│   ├── main.py
-│   ├── requirements.txt
-│   ├── config/
-│   ├── controllers/
-│   ├── models/
-│   ├── services/
-│   ├── templates/
-│   ├── routes.py
-│   └── modelos/           ← Aquí van los modelos preentrenados locales
-├── README.md
-└── .gitignore
-```
+> Los endpoints conservan el prefijo `openai-` por compatibilidad con el frontend; se renombrarán en la próxima etapa de refactor (ver [`docs/AUDITORIA.md`](docs/AUDITORIA.md)).
 
 ---
 
@@ -79,295 +78,281 @@ Integrador/
 - Seguimiento de la evolución de lesiones o tratamientos.
 - Herramienta educativa para conocer más sobre la salud de la piel.
 
-### Principales Condiciones Cutáneas Analizadas
+### Condiciones analizadas
 
-- **Lunares:** Identificación y clasificación de diferentes tipos de lesiones pigmentadas.
-- **Acné:** Identificación y clasificación de diferentes tipos de lesiones acneicas.
-- **Rosácea:** Detección de enrojecimiento, pápulas y telangiectasias.
-- **Manchas solares y lesiones atípicas:** Evaluación de hiperpigmentaciones y lesiones sospechosas.
-
----
-
-## ¿Quién puede usarlo?
-
-- Personas que desean cuidar su piel y detectar problemas a tiempo.
-- Profesionales de la salud que buscan una herramienta de apoyo.
-- Investigadores interesados en el análisis automatizado de imágenes dermatológicas.
-
----
-
-## Tabla de Contenido
-
-- [PielSana IA](#pielsana-ia)
-  - [Cuidando tu piel con inteligencia artificial](#cuidando-tu-piel-con-inteligencia-artificial)
-  - [¿Cómo funciona PielSana IA?](#cómo-funciona-pielsana-ia)
-  - [Estructura del Monorepo](#estructura-del-monorepo)
-  - [Casos de Uso](#casos-de-uso)
-    - [Principales Condiciones Cutáneas Analizadas](#principales-condiciones-cutáneas-analizadas)
-  - [¿Quién puede usarlo?](#quién-puede-usarlo)
-  - [Tabla de Contenido](#tabla-de-contenido)
-  - [Características Técnicas](#características-técnicas)
-  - [Tabla de Tecnologías](#tabla-de-tecnologías)
-  - [Diagrama de Arquitectura](#diagrama-de-arquitectura)
-  - [Capturas de Pantalla / GIF de Uso](#capturas-de-pantalla--gif-de-uso)
-  - [Instalación y Uso](#instalación-y-uso)
-    - [Requisitos](#requisitos)
-    - [Backend](#backend)
-    - [Frontend](#frontend)
-  - [Despliegue del Backend con Docker](#despliegue-del-backend-con-docker)
-    - [Construir la imagen Docker](#construir-la-imagen-docker)
-    - [Ejecutar el contenedor](#ejecutar-el-contenedor)
-  - [Nota sobre permisos de Docker en Linux/EC2](#nota-sobre-permisos-de-docker-en-linuxec2)
-  - [Exponer el backend con ngrok](#exponer-el-backend-con-ngrok)
-    - [Instrucciones para usar ngrok en EC2 (complemento, no reemplaza Docker)](#instrucciones-para-usar-ngrok-en-ec2-complemento-no-reemplaza-docker)
-  - [Ejemplo de Request/Response de la API](#ejemplo-de-requestresponse-de-la-api)
-  - [FAQ - Preguntas Frecuentes](#faq---preguntas-frecuentes)
-  - [Reconocimientos y Créditos](#reconocimientos-y-créditos)
-  - [Política de Privacidad](#política-de-privacidad)
-  - [Contribución](#contribución)
-  - [Licencia y Contacto](#licencia-y-contacto)
-  - [Modelos Integrados](#modelos-integrados)
-    - [Modelos locales](#modelos-locales)
+- **Lunares:** clasificación de 7 tipos de lesiones pigmentadas (dataset HAM10000).
+- **Acné:** detección binaria con / sin acné.
+- **Rosácea:** detección binaria con / sin rosácea.
+- **Análisis general con IA:** identificación abierta de la afección (incluye manchas solares) con DeepSeek.
 
 ---
 
 ## Características Técnicas
 
-PielSana IA combina lo último en inteligencia artificial y desarrollo web para ofrecer una experiencia robusta y segura:
+- **IA híbrida:** redes neuronales convolucionales (CNN) locales para visión por computadora + LLM de DeepSeek para interpretación y generación de texto.
+- **Frontend:** React + Vite + TypeScript + TailwindCSS, con modo oscuro.
+- **Backend:** API en FastAPI que recibe las imágenes y ejecuta los modelos.
+- **Despliegue:** Docker Compose con Caddy (HTTPS automático) en una VPS, con dominio DuckDNS.
+- **Privacidad:** procesamiento en memoria, sin base de datos ni almacenamiento de imágenes.
 
-- **IA Híbrida:** Potente combinación de redes neuronales convolucionales (CNN) locales para visión por computadora y LLMs (OpenAI) para interpretación y generación de texto.
-
-- **Frontend:** Interfaz web desarrollada en React/Vite, fácil de usar y accesible desde cualquier dispositivo.
-- **Backend:** API en FastAPI que gestiona la recepción y análisis de imágenes.
-- **Modelos de IA:** Utiliza un modelo local de análisis dermatológico (por ejemplo, entrenado sobre el dataset HAM10000). El sistema está preparado para integrar modelos adicionales en el futuro.
-- **Privacidad:** Procesamiento temporal de imágenes, sin almacenamiento de datos personales.
-- **Extensibilidad:** Arquitectura modular que permite agregar nuevos modelos y funcionalidades fácilmente.
-
-## Tabla de Tecnologías
-
-| Capa         | Tecnología                                 |
-|--------------|--------------------------------------------|
-| Frontend     | React, Vite, TypeScript, TailwindCSS       |
-| Backend      | FastAPI, Python, TensorFlow, Keras, OpenAI API |
-| Modelos      | Modelos locales (ej: lunares.keras, otros) |
-| Infraestructura | Docker, .env            |
-
-## Diagrama de Arquitectura
-
-```mermaid
-flowchart TD
-    Usuario -->|Carga imagen| Frontend
-    Frontend -->|Envía imagen| Backend
-    Backend -->|Procesa| ModeloLocal
-    ModeloLocal -->|Resultado| Backend
-    Backend -->|Resultados| Frontend
-```
-
-## Capturas de Pantalla / GIF de Uso
-
-<!-- Agrega aquí imágenes o GIFs mostrando el flujo de uso -->
-<!-- ![Ejemplo de uso](docs/ejemplo_uso.gif) -->
+| Capa            | Tecnología                                          |
+|-----------------|-----------------------------------------------------|
+| Frontend        | React 18, Vite, TypeScript, TailwindCSS, React Router |
+| Backend         | Python 3.10, FastAPI, TensorFlow/Keras, SDK `openai` (apuntando a DeepSeek) |
+| IA externa      | DeepSeek API (`deepseek-flash`)                      |
+| Modelos locales | `lunares.keras`, `acne.keras`, `rosacea.keras`       |
+| Infraestructura | Docker Compose, Caddy, DuckDNS, VPS Contabo          |
 
 ---
 
-## Instalación y Uso
+## Estructura del Monorepo
 
-### Requisitos
+```
+PielSanaIA-MVP/
+├── frontend/                  ← React + Vite (SPA)
+│   ├── src/
+│   │   ├── components/        ← Navbar, ImageUploader, ConditionsOverview...
+│   │   ├── pages/             ← Home, About, ConditionInfo, Results*
+│   │   └── main.tsx / App.tsx ← entrypoint y rutas
+│   ├── public/
+│   └── package.json
+├── backend/                   ← API FastAPI
+│   ├── main.py                ← app, CORS y registro de routers
+│   ├── controllers/skin.py    ← endpoints /skin/*
+│   ├── services/              ← inferencia con los modelos Keras
+│   ├── models/                ← esquemas Pydantic
+│   ├── config/model_config.py ← rutas de modelos y ajustes de TensorFlow
+│   ├── modelos/               ← modelos .keras (NO versionados, se suben aparte)
+│   ├── requirements.txt
+│   └── Dockerfile
+├── deploy/                    ← despliegue en VPS
+│   ├── Caddyfile              ← HTTPS + proxy /skin/* + fallback SPA
+│   ├── web.Dockerfile         ← build del front + Caddy
+│   ├── setup-vps.sh           ← preparación inicial de la VPS
+│   └── deploy.sh              ← actualizar la app
+├── docs/AUDITORIA.md          ← auditoría de arquitectura y avance
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
 
-- Python 3.10+
-- Node.js 18+ (para el frontend)
-- Docker (opcional)
+---
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+    Usuario -->|HTTPS 443| Caddy["web (Caddy)"]
+    Caddy -->|"/ (archivos estáticos)"| SPA[Frontend React]
+    Caddy -->|"/skin/*"| Backend["backend (FastAPI :8080)"]
+    Backend --> Modelos[("backend/modelos/*.keras")]
+    Backend -->|"análisis / recomendaciones"| DeepSeek[(DeepSeek API)]
+    DuckDNS["duckdns (actualiza IP)"] -.-> DNS[(duckdns.org)]
+```
+
+| Servicio  | Qué hace |
+|-----------|----------|
+| `web`     | Caddy: sirve el build de Vite, hace proxy de `/skin/*` al backend y obtiene/renueva el certificado Let's Encrypt. |
+| `backend` | La imagen de `backend/Dockerfile`. No expone puertos al exterior; los modelos se montan como volumen. |
+| `duckdns` | Mantiene el subdominio apuntando a la IP de la VPS. |
+
+---
+
+## Variables de entorno
+
+Plantilla en [`.env.example`](.env.example). Copiala a `.env` en la raíz (nunca la subas al repo).
+
+| Variable | Para qué | Ejemplo |
+|----------|----------|---------|
+| `DOMAIN` | Dominio público (Caddy y build del front) | `pielsana.duckdns.org` |
+| `DUCKDNS_SUBDOMAIN` | Subdominio de DuckDNS | `pielsana` |
+| `DUCKDNS_TOKEN` | Token de tu cuenta de DuckDNS | — |
+| `DEEPSEEK_API_KEY` | Clave de la API de DeepSeek (obligatoria para las funciones de IA) | `sk-...` |
+| `LLM_MODEL` | Opcional. Modelo de DeepSeek | `deepseek-flash` (default) |
+| `LLM_BASE_URL` | Opcional. URL de la API compatible con OpenAI | `https://api.deepseek.com` (default) |
+| `ALLOWED_ORIGINS` | Orígenes CORS permitidos, separados por coma. Vacío = cualquiera | `https://pielsana.duckdns.org` |
+| `LUNARES_MODEL_PATH`, `ACNE_MODEL_PATH`, `ROSACEA_MODEL_PATH` | Opcional. Rutas alternativas a los modelos | — |
+
+Si falta `DEEPSEEK_API_KEY` o DeepSeek no responde, los endpoints de IA devuelven `503 Servicio de IA no disponible`. Los análisis con modelos locales siguen funcionando.
+
+---
+
+## Desarrollo local
+
+**Requisitos:** Python 3.10, Node.js 18+, y opcionalmente Docker.
 
 ### Backend
 
+Se ejecuta **desde la raíz del repo**, porque los imports son `backend.*`:
+
 ```bash
-cd backend
 python3.10 -m venv venv
 source venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-python main.py
+pip install -r backend/requirements.txt
+cp .env.example .env          # completar DEEPSEEK_API_KEY
+uvicorn backend.main:app --reload --port 8080
 ```
-La API estará disponible en http://localhost:8080
+
+La API queda en http://localhost:8080 y la documentación interactiva en http://localhost:8080/docs.
+Para los análisis locales, copiá los `.keras` en `backend/modelos/` (ver [Modelos locales](#modelos-locales)).
 
 ### Frontend
 
 ```bash
 cd frontend
+echo "VITE_API_URL=http://localhost:8080" > .env.local
 npm install
 npm run dev
 ```
-La interfaz web estará disponible en http://localhost:5173
+
+La interfaz queda en http://localhost:5173.
+
+### Todo junto con Docker (igual que en producción)
+
+```bash
+cp .env.example .env    # poné DOMAIN=localhost
+docker compose up --build
+```
+
+Abrí https://localhost. Caddy usa un certificado local, así que el navegador va a mostrar una advertencia la primera vez.
 
 ---
 
-## Despliegue del Backend con Docker
+## Despliegue en VPS (Contabo + DuckDNS)
 
-Puedes correr el backend de FastAPI fácilmente usando Docker. Esto te permite desplegar la API en cualquier entorno compatible con Docker (local, nube, EC2, etc.).
+Toda la app (frontend + backend) corre en una VPS con Docker Compose, bajo `https://<subdominio>.duckdns.org` con HTTPS automático.
 
-### Construir la imagen Docker
-
-Desde la raíz del proyecto (donde está la carpeta backend/), ejecuta:
-
-```bash
-sudo docker build -t pielsana-backend -f backend/Dockerfile .
-```
-
-### Ejecutar el contenedor
-
-```bash
-sudo docker run -p 8080:8080 pielsana-backend
-```
-
-- El backend estará disponible en http://localhost:8080
-- Si necesitas montar modelos grandes, asegúrate de que estén presentes en la carpeta backend/modelos/ antes de construir la imagen.
-
----
-
-## Nota sobre permisos de Docker en Linux/EC2
-
-En algunas distribuciones de Linux (como Ubuntu en EC2), puede que necesites usar `sudo` para ejecutar comandos de Docker si tu usuario no tiene permisos suficientes. Ejemplo:
-
-```bash
-sudo docker build -t pielsana-backend -f backend/Dockerfile .
-sudo docker run -p 8080:8080 pielsana-backend
-```
-
-Si prefieres evitar usar `sudo` cada vez, puedes agregar tu usuario al grupo `docker`:
-
-```bash
-sudo usermod -aG docker $USER
-```
-Luego cierra y vuelve a abrir la sesión para que los cambios tengan efecto.
-
----
-
-
-## Exponer el backend con ngrok
-
-### Instrucciones para usar ngrok en EC2 (complemento, no reemplaza Docker)
-
-
-2. **Instala y ejecuta ngrok en tu instancia EC2**
+1. **DuckDNS:** en [duckdns.org](https://www.duckdns.org) creá el subdominio, poné la IP pública de la VPS y copiá el *token*.
+2. **Preparar la VPS** (como root, una sola vez): instala Docker, crea el usuario `deploy`, configura el firewall (22/80/443), agrega swap y clona el repo.
    ```bash
-   wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-   tar -xvzf ngrok-v3-stable-linux-amd64.tgz
-   sudo mv ngrok /usr/local/bin
-   ngrok http 8080
+   ssh root@IP_VPS
+   curl -fsSL https://raw.githubusercontent.com/thejoresp/PielSanaIA-MVP/main/deploy/setup-vps.sh | bash
    ```
-   (Opcional: agrega tu authtoken si tienes cuenta en ngrok)
+   > Si entrás a root con contraseña (sin clave SSH), el usuario `deploy` no va a tener acceso por SSH. Antes de seguir, desde tu máquina corré `ssh-copy-id root@IP_VPS` y volvé a ejecutar el script, o usá `su - deploy` desde root.
+3. **Variables de entorno:** `nano /home/deploy/PielSanaIA-MVP/.env` → `DOMAIN`, `DUCKDNS_SUBDOMAIN`, `DUCKDNS_TOKEN`, `DEEPSEEK_API_KEY`, `ALLOWED_ORIGINS`.
+4. **Subir los modelos** (no están en el repo), desde tu máquina:
+   ```bash
+   scp lunares.keras deploy@IP_VPS:~/PielSanaIA-MVP/backend/modelos/ham10000/
+   scp acne.keras    deploy@IP_VPS:~/PielSanaIA-MVP/backend/modelos/acne/
+   scp rosacea.keras deploy@IP_VPS:~/PielSanaIA-MVP/backend/modelos/rosacea/
+   ```
+5. **Levantar:**
+   ```bash
+   ssh deploy@IP_VPS
+   cd PielSanaIA-MVP && docker compose up -d --build
+   ```
+6. **Actualizar** después de un `git push`: `./deploy/deploy.sh` en la VPS.
 
-3. **Copia la URL HTTPS que te da ngrok**
-   (por ejemplo, `https://abcd1234.ngrok.io`)
+### Comprobar
 
-4. **Entra a Vercel y cambia la variable de entorno `VITE_API_URL`**
-   Pon la URL de ngrok y vuelve a desplegar el frontend.
+```bash
+docker compose ps                     # 3 servicios en "running"
+docker compose logs -f web            # emisión del certificado
+docker compose logs -f backend        # errores de la API / carga de modelos
+curl https://<sub>.duckdns.org/skin/api/condition/acne
+```
 
-5. **¡Listo!**
-   Tu frontend en Vercel podrá comunicarse con el backend por HTTPS sin problemas de mixed-content.
+> Los puertos 80 y 443 tienen que estar libres y accesibles desde Internet para que Let's Encrypt emita el certificado.
+>
+> **Legado:** los scripts de AWS EC2 (`infra.sh`, `connect_aws.sh`, `dockerUbuntu.txt`, `reboot_backend.sh`, `nginx_manager.sh`) y el uso de ngrok + Vercel quedaron obsoletos con este despliegue y se van a eliminar.
 
-> Recuerda: cada vez que reinicies ngrok, la URL cambiará y deberás actualizarla en Vercel.
+---
 
-> **Nota importante:**
-> 
-> El backend de PielSana IA debe estar siempre corriendo (por ejemplo, usando Docker, como se explica en las secciones anteriores).
-> 
-> La sección de ngrok es una opción adicional pensada para exponer temporalmente el backend por HTTPS, facilitando la integración con frontends desplegados en plataformas como Vercel (que requieren HTTPS para evitar problemas de mixed-content).
-> 
-> **ngrok no reemplaza Docker ni la ejecución normal del servidor:** simplemente crea un túnel seguro hacia el backend ya montado en Docker, útil para pruebas, demos o MVP, 
+## API
 
+Todas las rutas cuelgan de `/skin`. La documentación completa está en `/docs` (Swagger) del backend.
 
-## Ejemplo de Request/Response de la API
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/skin/api/analyze-lunares` | Clasifica un lunar (multipart `file`). Devuelve `{id}`; el resultado se consulta con el GET de abajo |
+| `GET`  | `/skin/api/analyze-lunares/{id}` | Resultado del análisis de lunares |
+| `POST` | `/skin/api/analyze-acne` | Detecta acné (multipart `file`) |
+| `POST` | `/skin/api/analyze-rosacea` | Detecta rosácea (multipart `file`) |
+| `POST` | `/skin/openai-analizar` | Análisis directo de la imagen con DeepSeek (multipart `file`) |
+| `POST` | `/skin/openai-recomendaciones` | Descripción y recomendaciones con DeepSeek. Body: `{"prediccion": "Con acné"}` |
+| `GET`  | `/skin/api/condition/{nombre}` | Información de una condición (`acne`, `rosacea`, `manchas`, `lunares`) |
 
-**Request:**
+**Ejemplo — análisis de acné**
+
 ```http
-POST /skin/api/analyze
+POST /skin/api/analyze-acne
 Content-Type: multipart/form-data
 
-file: imagen.png
+file: imagen.jpg
 ```
 
-**Response:**
 ```json
 {
-  "prediccion": "Lúnar Común (Nevus)",
-  "probabilidades": {
-    "Lúnar Común (Nevus)": 0.85,
-    "Melanoma": 0.10,
-    "Queratosis Benigna": 0.05
-  },
-  "modelo": "modelo local"
+  "filename": "imagen.jpg",
+  "content_type": "image/jpeg",
+  "prediccion": "Con acné",
+  "probabilidades": { "Con acné": 0.91, "Sin acné": 0.09 }
 }
 ```
+
+**Ejemplo — recomendaciones con DeepSeek**
+
+```bash
+curl -X POST https://<sub>.duckdns.org/skin/openai-recomendaciones \
+  -H 'Content-Type: application/json' -d '{"prediccion":"Con acné"}'
+```
+
+```json
+{
+  "descripcion": "El acné es...",
+  "recomendaciones": ["Lavar el rostro dos veces al día", "..."]
+}
+```
+
+---
+
+## Modelos locales
+
+Los modelos `.keras` **no se versionan** (están en `.gitignore` y `.dockerignore`). Hay que copiarlos a mano, y el contenedor los toma como volumen:
+
+| Modelo | Ruta esperada | Salida |
+|--------|---------------|--------|
+| Lunares (HAM10000) | `backend/modelos/ham10000/lunares.keras` | Queratosis Actínica, Carcinoma Basocelular, Queratosis Benigna, Dermatofibroma, Melanoma, Lunar Común (Nevus), Lesión Vascular |
+| Acné | `backend/modelos/acne/acne.keras` | Con acné / Sin acné |
+| Rosácea | `backend/modelos/rosacea/rosacea.keras` | Con rosácea / Sin rosácea |
+
+Los modelos se cargan la primera vez que se usan. Si falta un archivo, ese análisis devuelve error 500 y los demás siguen funcionando.
 
 ---
 
 ## FAQ - Preguntas Frecuentes
 
 **¿Se almacenan mis imágenes?**
-No, las imágenes se procesan y eliminan tras el análisis.
+No. Se procesan en memoria y se descartan. En el análisis con IA, la imagen se envía a DeepSeek para procesarla.
 
 **¿Puedo usar mis propios modelos?**
-Sí, el sistema es modular y permite integrar nuevos modelos fácilmente.
+Sí. Cambiá las rutas con `LUNARES_MODEL_PATH`, `ACNE_MODEL_PATH` o `ROSACEA_MODEL_PATH`, o agregá un nuevo servicio en `backend/services/`.
 
-**¿Qué limitaciones tiene el sistema?**
-Actualmente, el modelo base solo clasifica imágenes según las condiciones soportadas. El roadmap incluye la integración de más clasificadores específicos.
+**¿Puedo usar otro LLM?**
+Sí, cualquier API compatible con OpenAI: cambiá `LLM_BASE_URL`, `LLM_MODEL` y la clave.
 
----
-
-## Reconocimientos y Créditos
-
-- [FastAPI](https://fastapi.tiangolo.com/)
-- [React](https://react.dev/)
-- [Vite](https://vitejs.dev/)
-- [TailwindCSS](https://tailwindcss.com/)
-- [TensorFlow](https://www.tensorflow.org/)
-- [Keras](https://keras.io/)
+**¿Qué limitaciones tiene?**
+Solo clasifica las condiciones soportadas y los resultados son orientativos: no constituyen un diagnóstico médico.
 
 ---
 
 ## Política de Privacidad
 
-Este proyecto procesa imágenes de manera temporal y no almacena datos personales. Si se despliega públicamente, se recomienda agregar una política de privacidad detallada.
+Este proyecto procesa imágenes de manera temporal y no almacena datos personales. El análisis con IA envía la imagen a un proveedor externo (DeepSeek). Al desplegarlo públicamente se recomienda publicar una política de privacidad detallada que lo informe.
 
 ---
 
 ## Contribución
 
-¿Te gustaría colaborar?
-Haz un fork, crea tu rama, realiza tus cambios y abre un Pull Request. ¡Toda ayuda es bienvenida!
+¿Te gustaría colaborar? Hacé un fork, creá tu rama, realizá tus cambios y abrí un Pull Request. ¡Toda ayuda es bienvenida!
 
----
+## Reconocimientos y Créditos
+
+[FastAPI](https://fastapi.tiangolo.com/) · [React](https://react.dev/) · [Vite](https://vitejs.dev/) · [TailwindCSS](https://tailwindcss.com/) · [TensorFlow](https://www.tensorflow.org/) · [Keras](https://keras.io/) · [DeepSeek](https://www.deepseek.com/) · [Caddy](https://caddyserver.com/)
 
 ## Licencia y Contacto
 
 Este proyecto está bajo licencia MIT.
-Para consultas o colaboración, contacta a:
-- Nombre: [Jorge Espinola]
-- Email: [yorluis@hotmail.com]
-- GitHub: [github.com/thejoresp]
-
----
-
-## Modelos Integrados
-
-### Modelos locales
-- Puedes integrar cualquier modelo local de análisis dermatológico (por ejemplo, lunares.keras entrenado sobre HAM10000, u otros modelos propios o de terceros).
-- El sistema es modular y permite agregar nuevos modelos fácilmente.
-- **Próximamente:** Se sumarán modelos específicos para la detección de rosácea y acné, ampliando el alcance de la plataforma.
-- **Ejemplo de predicciones del modelo lunares.keras:**
-  - Queratosis Actínica
-  - Carcinoma Basocelular
-  - Queratosis Benigna
-  - Dermatofibroma
-  - Melanoma
-  - Lúnar Común (Nevus)
-  - Lesión Vascular
-
-> **Nota importante:**
-> 
-> El backend de PielSana IA debe estar siempre corriendo (por ejemplo, usando Docker, como se explica en las secciones anteriores).
-> 
-> La sección de ngrok es una opción adicional pensada para exponer temporalmente el backend por HTTPS, facilitando la integración con frontends desplegados en plataformas como Vercel (que requieren HTTPS para evitar problemas de mixed-content).
-> 
-> **ngrok no reemplaza Docker ni la ejecución normal del servidor:** simplemente crea un túnel seguro hacia el backend ya montado en Docker, útil para pruebas, demos o MVP, pero no para producción.
+- Nombre: Jorge Espinola
+- Email: yorluis@hotmail.com
+- GitHub: [github.com/thejoresp](https://github.com/thejoresp)

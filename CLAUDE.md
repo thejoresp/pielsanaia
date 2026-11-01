@@ -43,6 +43,7 @@ docker compose up -d --build          # .env en la raíz (plantilla .env.example
 - Errores hacia el cliente: mensajes genéricos. El detalle va a `logging` (no usar `print`).
 - Nada bloqueante dentro de `async def`: el LLM va con `await` y `model.predict` con `run_in_threadpool`.
 - Dependencias fijadas en `requirements.txt` según `pip freeze` en `python:3.10-slim`; al actualizarlas, resolver en esa imagen (varias libs nuevas ya exigen Python ≥3.11).
+- El backend recibe en compose solo sus variables (`environment:`), no el `.env` entero. Si se agrega una variable nueva, sumarla ahí. Las vacías toman el default del código: leer con `os.getenv("X") or "default"`, no con `os.getenv("X", "default")`.
 - uvicorn corre con `--proxy-headers` para que el rate limit vea la IP real detrás de Caddy.
 - El build del front es `tsc -b && vite build`: un error de tipos rompe el Docker build.
 
@@ -50,11 +51,10 @@ docker compose up -d --build          # .env en la raíz (plantilla .env.example
 - [x] Fase 0: quitar el log de la API key y migrar a DeepSeek.
 - [x] Hallazgos altos (A1–A8): dependencias fijadas, LLM async, rate limit, validación de imágenes, `lunares_results` eliminado, `conditions.ts` en el front, drag & drop, tsc/eslint en 0 y `setup-vps.sh`.
 - [x] Puntos medios (M1–M4): vistas muertas borradas y `GET /` como health; `src/api/client.ts` + `useRecommendations`; `Results.tsx` genérico; rutas `/skin/openai-*` renombradas a `/skin/api/analyze-ia` y `/skin/api/recomendaciones`.
-- [ ] Bajos: compose (`environment` explícito, duckdns con versión fija, healthcheck), `DarkModeToggle.tsx` a `components/`.
-- [ ] Fase 3: limpieza (scripts de AWS/ngrok, `setup-lightshot.exe`, `.gitignore.bak`).
+- [x] Puntos bajos (B1–B5): compose con `environment` explícito, healthcheck y duckdns fijado; `DarkModeToggle.tsx` en `components/`; limpieza de scripts de AWS/ngrok/gh-pages.
+- [ ] Dependencias con vulnerabilidades (`docs/AUDITORIA.md` §4).
 
 ## Pendiente conocido
 - Los endpoints de IA son públicos (con rate limit por IP). Falta el tope de gasto en el panel de DeepSeek (manual).
 - Si el LLM no responde, cada request espera hasta ~1 min (timeout 30 s + 1 reintento) antes del 503, pero ya no bloquea a los demás usuarios.
-- Vulnerabilidades de dependencias (Pillow → Python 3.11, Keras, npm) anotadas en `docs/AUDITORIA.md` §4, para después de los medios/bajos.
-- Pendientes medios/bajos en `docs/AUDITORIA.md` (compose: `env_file` completo, duckdns sin versión fija, sin healthcheck).
+- Vulnerabilidades de dependencias (Pillow → Python 3.11, Keras, npm) anotadas en `docs/AUDITORIA.md` §4: es lo próximo.

@@ -120,7 +120,6 @@ PielSanaIA-MVP/
 │   ├── main.py                ← app, CORS y registro de routers
 │   ├── controllers/skin.py    ← endpoints /skin/*
 │   ├── services/              ← inferencia con los modelos Keras
-│   ├── models/                ← esquemas Pydantic
 │   ├── config/model_config.py ← rutas de modelos y ajustes de TensorFlow
 │   ├── modelos/               ← modelos .keras (NO versionados, se suben aparte)
 │   ├── requirements.txt
@@ -248,15 +247,13 @@ Toda la app (frontend + backend) corre en una VPS con Docker Compose, bajo `http
 ### Comprobar
 
 ```bash
-docker compose ps                     # 3 servicios en "running"
+docker compose ps                     # 3 servicios en "running"; backend "(healthy)" tras ~1 min
 docker compose logs -f web            # emisión del certificado
 docker compose logs -f backend        # errores de la API / carga de modelos
 curl -I https://<sub>.duckdns.org/          # el front responde 200
 ```
 
 > Los puertos 80 y 443 tienen que estar libres y accesibles desde Internet para que Let's Encrypt emita el certificado.
->
-> **Legado:** los scripts de AWS EC2 (`infra.sh`, `connect_aws.sh`, `dockerUbuntu.txt`, `reboot_backend.sh`, `nginx_manager.sh`) y el uso de ngrok + Vercel quedaron obsoletos con este despliegue y se van a eliminar.
 
 ---
 

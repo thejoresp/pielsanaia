@@ -28,8 +28,8 @@
 - [x] Llamadas bloqueantes (`model.predict`, LLM) dentro de `async def`. **Resuelto:** `AsyncOpenAI` + `run_in_threadpool`.
 
 ### 🟢 Bajos
-- [ ] Basura en el repo: `frontend/setup-lightshot.exe`, `.gitignore.bak`, `backend/datosusuarioUbuntu.txt`, scripts de AWS/ngrok y scripts de gh-pages.
-- [ ] `DarkModeToggle.tsx` está suelto en `src/`.
+- [x] Basura en el repo: `frontend/setup-lightshot.exe`, `.gitignore.bak`, `backend/datosusuarioUbuntu.txt`, scripts de AWS/ngrok y scripts de gh-pages. **Resuelto:** borrados (siguen en el historial de git: `connect_aws.sh` tenía una IP de EC2).
+- [x] `DarkModeToggle.tsx` está suelto en `src/`. **Resuelto:** movido a `src/components/`.
 - [x] README desactualizado (árbol con `templates/` y `routes.py`, que no existen; instrucciones de EC2/ngrok). **Resuelto.**
 - [x] Imports repetidos dentro de `obtener_recomendaciones_openai`. **Resuelto en la Fase 0.**
 
@@ -51,9 +51,9 @@ Archivos revisados: `docker-compose.yml`, `deploy/*`, `.dockerignore`, `.env.exa
 - [x] **Docs contradictorias.** El README decía que los modelos quedan dentro de la imagen, pero `.dockerignore` los excluye; y `cd backend && python main.py` falla por los imports `backend.*`. **Resuelto:** el README actualizado explica el volumen y el `uvicorn` desde la raíz.
 
 ### 🟢 Bajos
-- [ ] El backend recibe todo el `.env` (incluido `DUCKDNS_TOKEN`) por `env_file` → pasarle solo las variables que usa.
-- [ ] `lscr.io/linuxserver/duckdns:latest` sin versión fija.
-- [ ] No hay `healthcheck` en compose; `GET /` todavía redirige a una ruta 404.
+- [x] El backend recibe todo el `.env` (incluido `DUCKDNS_TOKEN`) por `env_file` → pasarle solo las variables que usa. **Resuelto:** `environment:` con 6 variables; el código usa `os.getenv(X) or default` para que las vacías tomen el default.
+- [x] `lscr.io/linuxserver/duckdns:latest` sin versión fija. **Resuelto:** `8aabc87c-ls95` (mismo digest que `latest` al 2026-11-01).
+- [x] No hay `healthcheck` en compose; `GET /` todavía redirige a una ruta 404. **Resuelto:** healthcheck con `python -c urllib` contra `GET /`. `web` no espera a `healthy` para que el front siga arriba si el backend cae.
 - [x] Con la clave sin configurar, `logger.exception` imprime un traceback en cada request → avisar una sola vez al arrancar. **Resuelto:** un único `logger.warning` al primer uso.
 
 ### ✅ Lo que está bien en los cambios
@@ -83,7 +83,7 @@ Se re-auditó corriendo herramientas en lugar de solo leer: `tsc --noEmit`, `esl
 - [x] 🟡 **`transformers` en `requirements.txt` sin usarse** (cientos de MB en la imagen) → **Resuelto:** se quitó.
 - [x] 🟡 **`print()` en vez de `logging`** en el controller y el service → **Resuelto.**
 - [x] 🟢 **`setup-vps.sh` pedía `OPENAI_API_KEY`** en el mensaje final → **Resuelto.**
-- [ ] 🟢 Scripts `predeploy`/`deploy` de gh-pages y `vite-plugin-gh-pages` en `frontend/package.json` (va con la Fase 3).
+- [x] 🟢 Scripts `predeploy`/`deploy` de gh-pages y `vite-plugin-gh-pages` en `frontend/package.json` (va con la Fase 3). **Resuelto.**
 
 ### Pruebas realizadas (backend en `python:3.10-slim`)
 | Caso | Esperado | Resultado |
@@ -97,7 +97,7 @@ Se re-auditó corriendo herramientas en lugar de solo leer: `tsc --noEmit`, `esl
 | `GET /api/condition/acne`, `GET /api/analyze-lunares/x` | 404 (eliminados) | ✅ |
 
 ### Siguen pendientes
-Bajos de §1 y §2: `env_file` completo en el backend, duckdns sin versión fija, healthcheck en compose, `DarkModeToggle.tsx` suelto y la limpieza de la Fase 3.
+Medios y bajos de §1 y §2 resueltos (ver las tablas de pruebas abajo). Queda §4: vulnerabilidades de dependencias.
 
 ### Puntos medios (M1–M4) — pruebas detrás de Caddy
 | Caso | Esperado | Resultado |
@@ -108,6 +108,15 @@ Bajos de §1 y §2: `env_file` completo en el backend, duckdns sin versión fija
 | `/skin/openai-*`, `/skin/upload`, `/skin/api/analyze`, `GET /skin/`, `GET /skin/results` | 404 | ✅ |
 | `/results-{acne,rosacea,lunares,ia}` | 200 (SPA) | ✅ |
 | Bundle del front | solo rutas nuevas y clases de color de `Results.tsx` presentes | ✅ |
+
+### Puntos bajos (B1–B5) — pruebas
+| Caso | Esperado | Resultado |
+|---|---|---|
+| `docker compose config` (plugin vía `docker:27-cli`) | backend sin `DUCKDNS_TOKEN`, solo sus 6 variables | ✅ |
+| Backend con `LLM_MODEL`, `RATE_LIMIT_IA`, `MAX_IMAGE_MB`, `LLM_BASE_URL` vacías | defaults: `deepseek-flash`, `10/minute`, 5 MB | ✅ |
+| 11 × `POST /skin/api/recomendaciones` sin clave, detrás de Caddy | 503 ×10 y 429 | ✅ |
+| Healthcheck (`python -c urllib` contra `GET /`) | `healthy` | ✅ |
+| `/` y `/results-acne` desde Caddy; tsc, eslint y build | 200; 0 errores | ✅ |
 
 ---
 ## 4. Re-auditoría de dependencias (2026-11-01) — para más adelante

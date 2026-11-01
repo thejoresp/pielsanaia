@@ -3,7 +3,8 @@ from fastapi.responses import RedirectResponse
 from pathlib import Path
 import asyncio
 import uuid
-import openai
+import logging
+from openai import OpenAI
 import base64
 import os
 import re
@@ -13,6 +14,8 @@ from pydantic import BaseModel
 # Importar el servicio de análisis de piel
 from backend.services.skin_analysis_service import predict_lunares_class, predict_acne_class, predict_rosacea_class
 from backend.models.condition import ConditionInfo
+
+logger = logging.getLogger(__name__)
 
 # Configurar el router
 router = APIRouter()
@@ -286,6 +289,36 @@ async def api_analyze_rosacea(file: UploadFile = File(...)):
         print(f"Error en API /api/analyze-rosacea: {e}")
         raise HTTPException(status_code=500, detail=f"Error interno del servidor al analizar la imagen: {str(e)}")
 
+# --- Cliente LLM (DeepSeek, API compatible con el SDK de OpenAI) ---
+LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-flash")
+_llm_client = None
+
+def _llm_chat(messages, max_tokens=500) -> str:
+    """Envía un chat al LLM y devuelve el texto. Lanza 503 si el servicio no está disponible."""
+    global _llm_client
+    try:
+        if _llm_client is None:
+            api_key = os.getenv("DEEPSEEK_API_KEY")
+            if not api_key:
+                raise RuntimeError("DEEPSEEK_API_KEY no configurada")
+            _llm_client = OpenAI(
+                api_key=api_key,
+                base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"),
+                timeout=60,
+            )
+        response = _llm_client.chat.completions.create(
+            model=LLM_MODEL, messages=messages, max_tokens=max_tokens
+        )
+        return response.choices[0].message.content or ""
+    except Exception:
+        logger.exception("Error llamando al servicio de IA")
+        raise HTTPException(status_code=503, detail="Servicio de IA no disponible. Intenta nuevamente más tarde.")
+
+def _parse_llm_json(content: str):
+    # Limpia los bloques de código si existen
+    content = re.sub(r"^```json|^```|```$", "", content.strip(), flags=re.MULTILINE).strip()
+    return json.loads(content)
+
 @openai_router.post("/openai-analizar")
 async def analizar_imagen_openai(file: UploadFile = File(...)):
     image_bytes = await file.read()
@@ -294,70 +327,42 @@ async def analizar_imagen_openai(file: UploadFile = File(...)):
 
     prompt = (
         "Analiza la imagen de piel que te envío. "
-        "Dime qué tipo de afección ves (acné, lunares, rosácea, mancha solar, etc.). Que inicie con mayusculash "
+        "Dime qué tipo de afección ves (acné, lunares, rosácea, mancha solar, etc.). Que inicie con mayúscula. "
         "Dame una breve descripción educativa de la afección detectada. "
         "Dame también 5 recomendaciones para esa afección. "
         "Responde en formato JSON con los campos 'afeccion', 'descripcion' y 'recomendaciones' (lista de strings)."
     )
 
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    print("API KEY:", openai_api_key)
-    print("Tamaño de la imagen:", len(image_bytes))
-    openai.api_key = openai_api_key
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres un dermatólogo experto."},
-            {"role": "user", "content": [
-                {"type": "text", "text": prompt},
-                {"type": "image_url", "image_url": {"url": image_data_url}}
-            ]}
-        ],
-        max_tokens=500
-    )
-    print("Respuesta de OpenAI:", response.choices[0].message.content)
-
-    content = response.choices[0].message.content
-    # Limpia los bloques de código si existen
-    content = re.sub(r"^```json|^```|```$", "", content.strip(), flags=re.MULTILINE).strip()
+    content = _llm_chat([
+        {"role": "system", "content": "Eres un dermatólogo experto."},
+        {"role": "user", "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": image_data_url}}
+        ]}
+    ])
     try:
-        resultado = json.loads(content)
+        return _parse_llm_json(content)
     except Exception:
-        resultado = {
+        return {
             "afeccion": "No se pudo analizar",
             "recomendaciones": ["Intenta con otra imagen o consulta a un dermatólogo."]
         }
-    return resultado
 
 @openai_router.post("/openai-recomendaciones")
 async def obtener_recomendaciones_openai(request: PrediccionRequest):
-    import openai
-    import os
-    import json
-    import re
-    prediccion = request.prediccion
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    openai.api_key = openai_api_key
     prompt = (
-        f"Tengo un paciente con la siguiente condición dermatológica: '{prediccion}'. "
+        f"Tengo un paciente con la siguiente condición dermatológica: '{request.prediccion}'. "
         "Dame una breve descripción educativa de la condición detectada y 5 recomendaciones para el paciente. "
         "Responde en formato JSON con los campos 'descripcion' (string) y 'recomendaciones' (lista de strings)."
     )
-    response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Eres un dermatólogo experto."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=500
-    )
-    content = response.choices[0].message.content
-    content = re.sub(r"^```json|^```|```$", "", content.strip(), flags=re.MULTILINE).strip()
+    content = _llm_chat([
+        {"role": "system", "content": "Eres un dermatólogo experto."},
+        {"role": "user", "content": prompt}
+    ])
     try:
-        resultado = json.loads(content)
+        return _parse_llm_json(content)
     except Exception:
-        resultado = {"descripcion": "No se pudo generar la descripción.", "recomendaciones": ["No se pudieron generar recomendaciones. Intenta nuevamente."]}
-    return resultado
+        return {"descripcion": "No se pudo generar la descripción.", "recomendaciones": ["No se pudieron generar recomendaciones. Intenta nuevamente."]}
 
-# Registrar el router de OpenAI en el router principal
-router.include_router(openai_router) 
+# Registrar el router de IA en el router principal
+router.include_router(openai_router)

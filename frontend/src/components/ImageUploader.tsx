@@ -19,7 +19,7 @@ const mensajeDeError = (status: number): string => {
   if (status === 413) return `La imagen es demasiado grande (máximo ${MAX_IMAGE_MB} MB).`;
   if (status === 429) return 'Hiciste demasiadas solicitudes. Espera un minuto e intenta de nuevo.';
   if (status === 503) return 'El servicio de IA no está disponible en este momento. Intenta más tarde.';
-  if (status === 400) return 'El archivo debe ser una imagen.';
+  if (status === 400) return 'El archivo debe ser una imagen válida (por ejemplo JPG, PNG o WebP).';
   return 'Error al analizar la imagen. Intenta nuevamente.';
 };
 

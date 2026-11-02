@@ -3,7 +3,9 @@ import json
 import logging
 import os
 import re
+from io import BytesIO
 
+from PIL import Image
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from openai import AsyncOpenAI
@@ -30,18 +32,36 @@ limiter = Limiter(key_func=get_remote_address)
 MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_MB") or "5") * 1024 * 1024
 
 ERROR_ANALISIS = "No se pudo analizar la imagen. Intenta nuevamente."
+ERROR_NO_ES_IMAGEN = "El archivo debe ser una imagen."
+ERROR_IMAGEN_INVALIDA = "El archivo no es una imagen válida."
 
 class PrediccionRequest(BaseModel):
     prediccion: str = Field(..., min_length=1, max_length=100)
 
 
+def _es_imagen_valida(image_bytes: bytes) -> bool:
+    """True si Pillow reconoce el contenido como imagen (no confía en el Content-Type)."""
+    try:
+        with Image.open(BytesIO(image_bytes)) as img:
+            img.verify()
+        return True
+    except Exception:  # formato desconocido, archivo truncado, bomba de descompresión...
+        return False
+
+
 async def _leer_imagen(file: UploadFile) -> bytes:
-    """Valida tipo y tamaño de la imagen subida y devuelve sus bytes."""
+    """Valida tipo, tamaño y contenido de la imagen subida y devuelve sus bytes.
+
+    Se valida antes de llamar al modelo o al LLM: un archivo que no es imagen
+    no debe gastar inferencia ni una llamada paga.
+    """
     if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen.")
+        raise HTTPException(status_code=400, detail=ERROR_NO_ES_IMAGEN)
     image_bytes = await file.read(MAX_IMAGE_BYTES + 1)
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="La imagen supera el tamaño máximo permitido.")
+    if not image_bytes or not _es_imagen_valida(image_bytes):
+        raise HTTPException(status_code=400, detail=ERROR_IMAGEN_INVALIDA)
     return image_bytes
 
 

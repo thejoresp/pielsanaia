@@ -1,16 +1,30 @@
-# PielSana IA - despliegue en VPS (Contabo + DuckDNS)
-# Uso: cp .env.example .env  (completar)  &&  docker compose up -d --build
+# PielSana IA: despliegue con Docker Compose (VPS Contabo + DuckDNS).
+#   cp .env.example .env   (completar)
+#   docker compose up -d --build
+# En local, sin DuckDNS: DOMAIN=localhost y docker compose up --build backend web
 
-name: pielsanaia   # nombre fijo del proyecto Compose (no depende de la carpeta)
+name: pielsanaia   # nombre fijo del proyecto (no depende de la carpeta)
+
+# Opciones comunes a los tres servicios
+x-comunes: &comunes
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
 
 services:
+  # API FastAPI + modelos Keras. Sin puertos públicos: solo Caddy llega por la red interna.
   backend:
+    <<: *comunes
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: pielsana-backend
-    # Solo las variables que usa el backend (no recibe DUCKDNS_TOKEN ni el resto del .env).
-    # Las vacías toman el valor por defecto del código.
+    # Solo las variables del backend (no recibe DUCKDNS_TOKEN ni el resto del .env).
+    # Vacías = valor por defecto del código.
     environment:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
@@ -19,47 +33,48 @@ services:
       RATE_LIMIT_IA: ${RATE_LIMIT_IA:-}
       MAX_IMAGE_MB: ${MAX_IMAGE_MB:-}
     volumes:
-      # Los modelos .keras no van en la imagen: se suben a la VPS con scp
-      - ./backend/modelos:/app/backend/modelos
-    restart: unless-stopped
-    # GET / es el health del backend (la imagen slim no trae curl)
+      # Los .keras no van en la imagen: se suben con scp. Solo lectura.
+      - ./backend/modelos:/app/backend/modelos:ro
+    expose:
+      - "8080"
+    # GET / es el health (la imagen slim no trae curl).
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 60s
-    # Sin puertos públicos: solo accesible desde Caddy por la red interna
 
+  # Caddy: frontend estático, proxy /skin/* al backend y HTTPS automático.
   web:
+    <<: *comunes
     build:
       context: .
       dockerfile: deploy/web.Dockerfile
       args:
-        VITE_API_URL: https://${DOMAIN}
-    container_name: pielsana-web
+        VITE_API_URL: https://${DOMAIN:?Falta DOMAIN en .env}
     environment:
-      DOMAIN: ${DOMAIN}
+      DOMAIN: ${DOMAIN:?Falta DOMAIN en .env}
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp"
+      - "443:443/udp"   # HTTP/3
     volumes:
-      - caddy_data:/data
+      - caddy_data:/data       # certificados
       - caddy_config:/config
+    # Sin condición de healthy: si el backend cae, el front sigue arriba.
     depends_on:
       - backend
-    restart: unless-stopped
 
+  # Mantiene actualizada la IP pública en DuckDNS.
   duckdns:
-    image: lscr.io/linuxserver/duckdns:8aabc87c-ls95  # = latest al 2026-11-01
-    container_name: pielsana-duckdns
+    <<: *comunes
+    image: lscr.io/linuxserver/duckdns:8aabc87c-ls95   # = latest al 2026-11-01
     environment:
-      SUBDOMAINS: ${DUCKDNS_SUBDOMAIN}
-      TOKEN: ${DUCKDNS_TOKEN}
+      SUBDOMAINS: ${DUCKDNS_SUBDOMAIN:?Falta DUCKDNS_SUBDOMAIN en .env}
+      TOKEN: ${DUCKDNS_TOKEN:?Falta DUCKDNS_TOKEN en .env}
       TZ: America/Argentina/Buenos_Aires
       LOG_FILE: "false"
-    restart: unless-stopped
 
 volumes:
   caddy_data:

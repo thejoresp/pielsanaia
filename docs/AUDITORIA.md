@@ -124,6 +124,7 @@ Medios y bajos de §1 y §2 resueltos (ver las tablas de pruebas abajo). Queda �
 Las imágenes se construyeron con `docker build` y se probaron de punta a punta detrás de Caddy (413, 429, 503, IP real con `--proxy-headers` y un `X-Forwarded-For` falso que no saltea el límite). A1–A8 quedan verificados. Estos hallazgos se dejan para después de cerrar los medios y bajos de §1 y §2:
 
 - [x] 🔴 **Pillow 12.3.0: 39 vulnerabilidades conocidas** (`pip-audit`). Se corrigen en 13.0.0, que exige Python ≥3.11 → pasar `backend/Dockerfile` a `python:3.11-slim` (TF 2.19 soporta 3.9–3.12), re-resolver `requirements.txt` con `pip freeze` en esa imagen y actualizar la nota de Python 3.10 en `CLAUDE.md`. Es el más urgente: Pillow abre las imágenes que suben los usuarios.
+  - Las **5 alertas críticas de Dependabot** (2026-11-01) eran todas de Pillow 12.3.0, verificado contra OSV/GHSA: GHSA-332p-7hrc-92wf (overflow al guardar TIFF), GHSA-5x8w-8jj5-q52h (overflow en JPEG de FlashPix, ejecución de código), GHSA-8g5g-8vmr-9782 (overflow en `ImagingJpegDecode`), GHSA-v9pv-5gc8-w2m6 (memoria reutilizada en loaders multi-frame) y GHSA-w889-685w-c8fh (inyección de argumentos a Ghostscript). Pillow 13.0.0 las cierra; con las versiones locales, OSV no informa ninguna crítica ni alta (3 moderadas y 1 baja, las del front). En GitHub y en la VPS siguen hasta el push y el deploy.
 - [x] 🟠 **Keras 3.12.4: 4 vulnerabilidades**, corregidas en 3.15.0 (vía tensorflow/keras). Riesgo menor: solo se cargan `.keras` propios. Hacerlo junto con el cambio de Python.
 - [x] 🟠 **npm audit: 24 vulnerabilidades (16 altas)** → **13 (0 altas)** el 2026-11-02, en tres etapas sin cambios de código:
 
@@ -135,7 +136,15 @@ Las imágenes se construyeron con `docker build` y se probaron de punta a punta 
   | 3 | react-router-dom ^7.18.5 (sale `@remix-run/router`) | 13 (12 moderadas, 1 baja) |
 
   Pruebas: `tsc -b`, `eslint` y `vite build` en cada etapa; `npm run dev` sirve con Vite 6; `npm audit --audit-level=high` sale con 0; build Docker con `node:20-alpine` y stack detrás de Caddy (`/`, `/about`, `/conditions/acne`, `/results-*` → 200; asset `immutable`; recomendaciones 503×3 → 429); el bundle no incluye `@remix-run`. Falta la prueba manual en el navegador.
-- [ ] 🟢 **Residuales del front (12 moderadas, 1 baja), solo desarrollo:** `minimatch <11` dentro de eslint 9 (`@eslint/config-array`, `@eslint/eslintrc`), typescript-eslint 8 y tailwind 3 → sucrase → glob. No llegan al bundle ni corren con datos de usuarios. eslint 10 tampoco las cierra (usa minimatch 10); se resolverían con versiones nuevas de typescript-eslint/tailwind 4. La baja (`@eslint/plugin-kit <0.3.4`) cae con `npm update eslint`.
+- [ ] 🟢 **Residuales del front, solo desarrollo:** `npm audit` informa 13 paquetes (12 moderados, 1 bajo), pero son **3 avisos reales**. npm marca también a cada paquete que depende de uno vulnerable cuando el arreglo no entra en su rango, así que un mismo aviso se cuenta varias veces:
+
+  | Aviso real | Severidad | Paquetes que npm marca por él |
+  |---|---|---|
+  | `minimatch <11.0.1`: ReDoS por amplificación de globparts | moderada | `minimatch` + 10 que lo usan: `eslint`, `@eslint/config-array`, `@eslint/eslintrc`, `typescript-eslint`, los 5 `@typescript-eslint/*` y `sucrase` (tailwind 3 → sucrase → glob) |
+  | `glob`: cancelación con AbortSignal salteable | moderada | `glob` |
+  | `@eslint/plugin-kit <0.3.4`: ReDoS | baja | `@eslint/plugin-kit` |
+
+  Los tres corren solo en desarrollo o en el build (eslint, typescript-eslint, tailwind), nunca con datos de usuarios, y no llegan al bundle. Las 6 moderadas del inicio (`@babel/helpers`, `@humanfs/node`, `ajv`, `esbuild`, `postcss-selector-parser`, `yaml`) ya quedaron resueltas con las etapas 1–3. Para cerrar `minimatch` hace falta minimatch 11, que eslint 9/10, typescript-eslint 8 y tailwind 3 todavía no aceptan; la baja cae con `npm update eslint`.
 - [ ] 🟢 **Carga lazy de modelos sin lock:** dos requests simultáneos en el threadpool pueden cargar el mismo `.keras` dos veces → `threading.Lock` en `load_*_model`.
 - [ ] 🟢 **Imagen del backend de 3,73 GB**, casi todo TensorFlow → evaluar `tensorflow-cpu`.
 

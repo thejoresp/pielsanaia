@@ -121,6 +121,7 @@ pielsanaia/
 │   ├── controllers/skin.py    ← endpoints /skin/*
 │   ├── services/              ← inferencia con los modelos Keras
 │   ├── config/model_config.py ← rutas de modelos y ajustes de TensorFlow
+│   ├── tests/                 ← pytest de todos los endpoints (TDD)
 │   ├── modelos/               ← modelos .keras (NO versionados, se suben aparte)
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -208,6 +209,21 @@ npm run dev
 
 La interfaz queda en http://localhost:5173.
 
+### Tests del backend
+
+Cubren todos los endpoints (health, modelos locales, IA, recomendaciones y rate limit) sin red ni modelos: los `.keras` y DeepSeek se reemplazan por dobles. `test_modelo_real.py` usa el `acne.keras` real si está en `backend/modelos/acne/` y, si no, se saltea.
+
+```bash
+# Con el venv del backend (desde la raíz)
+pip install -r backend/requirements-dev.txt
+python -m pytest
+
+# O en Docker, con la misma imagen que producción
+docker build -f backend/Dockerfile -t pielsanaia-backend:test .
+docker run --rm -u root -v "$PWD":/src -w /src pielsanaia-backend:test \
+  sh -c 'pip install -q -r backend/requirements-dev.txt && python -m pytest'
+```
+
 ### Todo junto con Docker (igual que en producción)
 
 ```bash
@@ -282,7 +298,8 @@ Todas las rutas cuelgan de `/skin` (además, `GET /` del backend es un health in
 | `POST` | `/skin/api/analyze-ia` | Análisis directo de la imagen con DeepSeek (multipart `file`) |
 | `POST` | `/skin/api/recomendaciones` | Descripción y recomendaciones con DeepSeek. Body: `{"prediccion": "Con acné"}` |
 
-- Las imágenes se validan en todos los endpoints: `400` si no es una imagen y `413` si supera `MAX_IMAGE_MB`.
+- Las imágenes se validan en todos los endpoints antes de llamar al modelo o al LLM: `400` si no es `image/*`, si está vacía o si Pillow no la reconoce como imagen (un `.txt` renombrado a `.jpg` no pasa), y `413` si supera `MAX_IMAGE_MB`.
+- Los endpoints de IA responden siempre con la misma forma: `analyze-ia` → `{afeccion, descripcion, recomendaciones: [str]}` y `recomendaciones` → `{descripcion, recomendaciones: [str]}`. Si el LLM devuelve otra cosa, se completa con textos de respaldo.
 - Los dos endpoints de IA tienen rate limit por IP (`429` al superar `RATE_LIMIT_IA`); `prediccion` admite hasta 100 caracteres (`422`). Si DeepSeek no responde o falta la clave, devuelven `503`.
 - El contenido educativo de cada condición (causas, síntomas, tratamiento) vive en el front: `frontend/src/data/conditions.ts`.
 - **Tope de gasto:** además del rate limit, configurá un límite de gasto en el panel de DeepSeek.

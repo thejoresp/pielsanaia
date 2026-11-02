@@ -12,6 +12,7 @@ App web que analiza fotos de piel (lunares, acné, rosácea) con modelos Keras l
 # Backend (desde la RAÍZ: los imports son backend.*)
 uvicorn backend.main:app --reload --port 8080
 python -m py_compile backend/controllers/skin.py
+pip install -r backend/requirements-dev.txt && python -m pytest   # tests (ver README → Tests del backend)
 
 # Frontend
 cd frontend && npm run dev            # requiere frontend/.env.local con VITE_API_URL=http://localhost:8080
@@ -41,6 +42,8 @@ docker compose up -d --build          # .env en la raíz (plantilla .env.example
 - El front y el back se sirven desde el mismo dominio. El build del front recibe `VITE_API_URL=https://${DOMAIN}`.
 - El prefijo `/skin` lo usa el `Caddyfile`. Si cambia, hay que actualizar los dos lados.
 - Errores hacia el cliente: mensajes genéricos. El detalle va a `logging` (no usar `print`).
+- Tests en `backend/tests/` (pytest, TDD): todo endpoint nuevo o cambio de comportamiento lleva su test primero. Sin red ni `.keras`: dobles en `conftest.py` (`modelo_falso`, `llm_falso`). Los tests y `requirements-dev.txt` no entran en la imagen.
+- `_leer_imagen()` valida con Pillow (`verify`) antes de llamar al modelo o al LLM. Las respuestas del LLM pasan por `_respuesta_llm()`, que fija la forma que espera el front.
 - Nada bloqueante dentro de `async def`: el LLM va con `await` y `model.predict` con `run_in_threadpool`.
 - Dependencias fijadas en `requirements.txt` (incluida `keras`, que TF acepta en cualquier `>=3.5`) y resueltas en `python:3.11-slim`; al actualizarlas, resolver en esa imagen y repetir `pip check` + `pip-audit`. Pillow 13 y Keras 3.15 exigen Python ≥3.11.
 - Imágenes: el backend corre como usuario sin privilegios `app` y sin paquetes de sistema (todo sale de wheels). Caddy está fijado en `caddy:2.11-alpine`, Node en `node:20-alpine`.

@@ -189,3 +189,24 @@ Se reescribieron desde cero `docker-compose.yml`, `backend/Dockerfile`, `deploy/
 
 - [ ] Manual, tras el deploy en la VPS: `docker compose exec backend python -c "from backend.services import skin_analysis_service as s; print([m() is not None for m in (s.load_lunares_model, s.load_acne_model, s.load_rosacea_model)])"` → `[True, True, True]` (lunares y rosacea no se pudieron probar localmente). Si falla: volver al commit anterior y `./deploy/deploy.sh`.
 - [ ] Migración de la VPS: README → "Migrar una VPS existente" (los contenedores pasan a `pielsanaia-*-1`).
+
+## 7. Tests de los endpoints con TDD (2026-11-02)
+
+Suite pytest en `backend/tests/` (82 tests) sobre todos los endpoints, sin red ni modelos (dobles de `predict_*_class` y de DeepSeek), más una prueba de integración con el `acne.keras` real.
+
+| Archivo | Cubre |
+|---|---|
+| `test_health.py` | `GET /` y que las rutas viejas sigan dando 404/405 |
+| `test_modelos_locales.py` | los 3 modelos: 200 con JPEG/PNG RGBA/gris/WebP, 400, 413, 422, 500 genérico sin filtrar detalle, sin rate limit |
+| `test_ia.py` | `analyze-ia`: JSON, bloque ```` ```json ````, respaldo, forma normalizada, 503 sin clave o con error del LLM, 400/413 sin llamar al LLM, data URL |
+| `test_recomendaciones.py` | JSON, respaldo, forma normalizada, 422, 503 |
+| `test_rate_limit.py` | 429 en la petición N+1 de cada endpoint de IA, límite por endpoint |
+| `test_modelo_real.py` | `acne.keras` real: probabilidades válidas que suman 1, etiqueta coherente, determinismo (se saltea sin el modelo) |
+
+**Fase roja:** 26 tests fallaron sobre el código existente y revelaron 3 bugs:
+
+- [x] **R1:** un archivo con `Content-Type: image/*` que no era imagen (texto, PDF renombrado) daba 500 en los modelos y **se enviaba igual a DeepSeek** (llamada paga). Ahora → 400 sin llamar al modelo ni al LLM (`Image.verify` en `_leer_imagen`).
+- [x] **R2:** un archivo vacío daba 500 o llegaba al LLM. Ahora → 400.
+- [x] **R3:** si el LLM devolvía JSON válido con otra forma (lista, campos faltantes, tipos incorrectos), se pasaba tal cual al front; el respaldo de `analyze-ia` además no traía `descripcion`. Ahora `_respuesta_llm()` fija el contrato y descarta campos extra.
+
+**Fase verde:** 82/82 (77 con dobles + 5 con el modelo real). De punta a punta detrás de Caddy: `.txt` renombrado y archivo vacío → 400 en `analyze-acne` y `analyze-ia`; imagen válida sin modelo → 500 genérico; sin clave → 503. Los tests no entran en la imagen de producción.

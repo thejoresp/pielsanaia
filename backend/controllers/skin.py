@@ -145,6 +145,52 @@ def _parse_llm_json(content: str):
     return json.loads(content)
 
 
+RESPALDO_IA = {
+    "afeccion": "No se pudo analizar",
+    "descripcion": "No se pudo generar la descripción.",
+    "recomendaciones": ["Intenta con otra imagen o consulta a un dermatólogo."],
+}
+RESPALDO_RECOMENDACIONES = {
+    "descripcion": "No se pudo generar la descripción.",
+    "recomendaciones": ["No se pudieron generar recomendaciones. Intenta nuevamente."],
+}
+
+
+def _texto(valor) -> str | None:
+    return valor.strip() if isinstance(valor, str) and valor.strip() else None
+
+
+def _lista_de_textos(valor) -> list[str]:
+    if isinstance(valor, str):
+        valor = [valor]
+    if not isinstance(valor, list):
+        return []
+    return [x.strip() for x in valor if isinstance(x, str) and x.strip()]
+
+
+def _respuesta_llm(content: str, respaldo: dict) -> dict:
+    """Convierte la respuesta del LLM al contrato fijo del front.
+
+    Devuelve exactamente las claves de `respaldo`: los textos como string no vacío y
+    `recomendaciones` como lista de strings. Lo que falte o venga con otro tipo se
+    completa con el respaldo; los campos extra se descartan.
+    """
+    try:
+        datos = _parse_llm_json(content)
+    except Exception:
+        datos = None
+    if not isinstance(datos, dict):
+        logger.warning("Respuesta del LLM sin el formato JSON esperado (%d caracteres)", len(content))
+        datos = {}
+    resultado = {}
+    for campo, por_defecto in respaldo.items():
+        if campo == "recomendaciones":
+            resultado[campo] = _lista_de_textos(datos.get(campo)) or por_defecto
+        else:
+            resultado[campo] = _texto(datos.get(campo)) or por_defecto
+    return resultado
+
+
 @router.post("/api/analyze-ia", tags=["Skin Analysis API"])
 @limiter.limit(RATE_LIMIT_IA)
 async def analizar_imagen_ia(request: Request, file: UploadFile = File(...)):
@@ -167,13 +213,7 @@ async def analizar_imagen_ia(request: Request, file: UploadFile = File(...)):
             {"type": "image_url", "image_url": {"url": image_data_url}}
         ]}
     ])
-    try:
-        return _parse_llm_json(content)
-    except Exception:
-        return {
-            "afeccion": "No se pudo analizar",
-            "recomendaciones": ["Intenta con otra imagen o consulta a un dermatólogo."]
-        }
+    return _respuesta_llm(content, RESPALDO_IA)
 
 
 @router.post("/api/recomendaciones", tags=["Skin Analysis API"])
@@ -188,8 +228,5 @@ async def obtener_recomendaciones(request: Request, body: PrediccionRequest):
         {"role": "system", "content": "Eres un dermatólogo experto."},
         {"role": "user", "content": prompt}
     ])
-    try:
-        return _parse_llm_json(content)
-    except Exception:
-        return {"descripcion": "No se pudo generar la descripción.", "recomendaciones": ["No se pudieron generar recomendaciones. Intenta nuevamente."]}
+    return _respuesta_llm(content, RESPALDO_RECOMENDACIONES)
 

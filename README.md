@@ -95,7 +95,7 @@ Se usa de dos maneras:
 
 | Capa            | Tecnología                                          |
 |-----------------|-----------------------------------------------------|
-| Frontend        | React 18, Vite, TypeScript, TailwindCSS, React Router |
+| Frontend        | React 18, Vite 6, TypeScript, TailwindCSS, React Router 7 |
 | Backend         | Python 3.11, FastAPI, TensorFlow/Keras, SDK `openai` (apuntando a DeepSeek) |
 | IA externa      | DeepSeek API (`deepseek-flash`)                      |
 | Modelos locales | `lunares.keras`, `acne.keras`, `rosacea.keras`       |

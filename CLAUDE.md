@@ -4,7 +4,7 @@ App web que analiza fotos de piel (lunares, acné, rosácea) con modelos Keras l
 
 ## Stack
 - **Backend:** Python 3.11, FastAPI, TensorFlow/Keras (solo CPU), SDK `openai` apuntando a **DeepSeek** (`base_url=https://api.deepseek.com`, modelo `deepseek-flash`, que acepta imágenes). No hay base de datos.
-- **Frontend:** React 18 + Vite + TypeScript + Tailwind + React Router (`BrowserRouter`).
+- **Frontend:** React 18 + Vite 6 + TypeScript + Tailwind + React Router 7 (`BrowserRouter`, modo declarativo: imports desde `react-router-dom`). Node ≥20.
 - **Deploy:** VPS Contabo + DuckDNS con Docker Compose: `web` (Caddy: front estático + proxy `/skin/*` + HTTPS), `backend` (sin puertos públicos) y `duckdns`.
 
 ## Comandos
@@ -57,10 +57,12 @@ docker compose up -d --build          # .env en la raíz (plantilla .env.example
 - [x] Puntos medios (M1–M4): vistas muertas borradas y `GET /` como health; `src/api/client.ts` + `useRecommendations`; `Results.tsx` genérico; rutas `/skin/openai-*` renombradas a `/skin/api/analyze-ia` y `/skin/api/recomendaciones`.
 - [x] Puntos bajos (B1–B5): compose con `environment` explícito, healthcheck y duckdns fijado; `DarkModeToggle.tsx` en `components/`; limpieza de scripts de AWS/ngrok/gh-pages.
 - [x] Infra reescrita desde cero (compose, Dockerfiles, Caddyfile, scripts) y backend en Python 3.11 sin vulnerabilidades (Pillow 13, TF 2.19.1, Keras 3.15.1).
-- [ ] Dependencias del frontend con vulnerabilidades (`docs/AUDITORIA.md` §4).
+- [x] Vulnerabilidades altas del frontend: `npm audit fix`, Vite 6.4.5 y React Router 7.18.5 (24 → 13, 0 altas).
+- [ ] Moderadas/bajas residuales del frontend (eslint, typescript-eslint, tailwind → minimatch), solo desarrollo (`docs/AUDITORIA.md` §4).
 
 ## Pendiente conocido
 - Los endpoints de IA son públicos (con rate limit por IP). Falta el tope de gasto en el panel de DeepSeek (manual).
 - Si el LLM no responde, cada request espera hasta ~1 min (timeout 30 s + 1 reintento) antes del 503, pero ya no bloquea a los demás usuarios.
-- Vulnerabilidades del frontend (vite, react-router-dom, postcss) en `docs/AUDITORIA.md` §4: es lo próximo. Plan ya probado: vite ^6.4.5, plugin-react ^4.7.0, react-router-dom ^7.18.5 → 12 moderadas residuales de eslint (solo dev).
+- Frontend: 13 vulnerabilidades residuales (12 moderadas, 1 baja), todas en herramientas de desarrollo (eslint, typescript-eslint, tailwind → sucrase → glob → minimatch). No llegan al bundle. Detalle en `docs/AUDITORIA.md` §4.
+- Probar a mano en el navegador el salto a React Router 7 (navegación, resultados, F5, links).
 - Tras el próximo deploy, verificar en la VPS que carguen los 3 modelos con Keras 3.15 (solo se probó `acne.keras`): ver `docs/AUDITORIA.md` §6.

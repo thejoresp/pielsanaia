@@ -125,7 +125,17 @@ Las imágenes se construyeron con `docker build` y se probaron de punta a punta 
 
 - [x] 🔴 **Pillow 12.3.0: 39 vulnerabilidades conocidas** (`pip-audit`). Se corrigen en 13.0.0, que exige Python ≥3.11 → pasar `backend/Dockerfile` a `python:3.11-slim` (TF 2.19 soporta 3.9–3.12), re-resolver `requirements.txt` con `pip freeze` en esa imagen y actualizar la nota de Python 3.10 en `CLAUDE.md`. Es el más urgente: Pillow abre las imágenes que suben los usuarios.
 - [x] 🟠 **Keras 3.12.4: 4 vulnerabilidades**, corregidas en 3.15.0 (vía tensorflow/keras). Riesgo menor: solo se cargan `.keras` propios. Hacerlo junto con el cambio de Python.
-- [ ] 🟠 **npm audit: 24 vulnerabilidades (16 altas)**, todas con arreglo. Directas: `vite`, `postcss`, `react-router-dom` (esta última llega al build). Revisar saltos de versión mayor. GitHub (Dependabot) informa 53 alertas.
+- [x] 🟠 **npm audit: 24 vulnerabilidades (16 altas)** → **13 (0 altas)** el 2026-11-02, en tres etapas sin cambios de código:
+
+  | Etapa | Cambio | npm audit |
+  |---|---|---|
+  | Inicio | vite 5.4.8, react-router-dom 6.30.1, postcss 8.4.47 | 24 (16 altas) |
+  | 1 | `npm audit fix` + `brace-expansion` 1.1.21 (vía eslint > minimatch 3; audit fix no lo tocaba) | 18 (1 alta: vite) |
+  | 2 | vite ^6.4.5 + @vitejs/plugin-react ^4.7.0 | 15 (0 altas) |
+  | 3 | react-router-dom ^7.18.5 (sale `@remix-run/router`) | 13 (12 moderadas, 1 baja) |
+
+  Pruebas: `tsc -b`, `eslint` y `vite build` en cada etapa; `npm run dev` sirve con Vite 6; `npm audit --audit-level=high` sale con 0; build Docker con `node:20-alpine` y stack detrás de Caddy (`/`, `/about`, `/conditions/acne`, `/results-*` → 200; asset `immutable`; recomendaciones 503×3 → 429); el bundle no incluye `@remix-run`. Falta la prueba manual en el navegador.
+- [ ] 🟢 **Residuales del front (12 moderadas, 1 baja), solo desarrollo:** `minimatch <11` dentro de eslint 9 (`@eslint/config-array`, `@eslint/eslintrc`), typescript-eslint 8 y tailwind 3 → sucrase → glob. No llegan al bundle ni corren con datos de usuarios. eslint 10 tampoco las cierra (usa minimatch 10); se resolverían con versiones nuevas de typescript-eslint/tailwind 4. La baja (`@eslint/plugin-kit <0.3.4`) cae con `npm update eslint`.
 - [ ] 🟢 **Carga lazy de modelos sin lock:** dos requests simultáneos en el threadpool pueden cargar el mismo `.keras` dos veces → `threading.Lock` en `load_*_model`.
 - [ ] 🟢 **Imagen del backend de 3,73 GB**, casi todo TensorFlow → evaluar `tensorflow-cpu`.
 

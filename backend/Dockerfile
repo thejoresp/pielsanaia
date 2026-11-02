@@ -1,25 +1,28 @@
-# Usa una imagen oficial de Python como base
-FROM python:3.10-slim
+# Backend de PielSana IA: FastAPI + TensorFlow (solo CPU).
+# Se construye desde la raíz del repo (los imports son backend.*).
+FROM python:3.11-slim
 
-# Establece el directorio de trabajo
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TF_CPP_MIN_LOG_LEVEL=2
+
 WORKDIR /app
 
-# Copia los archivos de dependencias primero para aprovechar el cache de Docker
+# Dependencias primero: la capa se reutiliza mientras requirements.txt no cambie.
+# Todo se instala desde wheels, no hacen falta paquetes del sistema.
 COPY backend/requirements.txt ./requirements.txt
+RUN pip install --upgrade pip setuptools \
+ && pip install -r requirements.txt
 
-# Instala las dependencias del sistema necesarias 
-RUN apt-get update && \
-    apt-get install -y build-essential libglib2.0-0 libsm6 libxext6 libxrender-dev && \
-    pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copia la carpeta backend al contenedor
+# Usuario sin privilegios. Los modelos .keras se montan como volumen de solo lectura.
+RUN useradd --create-home --uid 1000 app
 COPY backend ./backend
+USER app
 
-# Expone el puerto que usará Uvicorn
 EXPOSE 8080
 
-# Comando para ejecutar la aplicación
-# --proxy-headers: toma la IP real del cliente desde Caddy (necesario para el rate limit por IP).
-# Es seguro aceptar cualquier proxy porque el backend no publica puertos.
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"] 
+# --proxy-headers: toma la IP real del cliente desde Caddy (la usa el rate limit por IP).
+# Aceptar cualquier proxy es seguro porque el backend no publica puertos.
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -1,8 +1,19 @@
-# Caddy obtiene y renueva automáticamente el certificado HTTPS (Let's Encrypt) para {$DOMAIN}
+# PielSana IA. Caddy emite y renueva solo el certificado HTTPS de {$DOMAIN}
+# (con DOMAIN=localhost usa un certificado local).
 {$DOMAIN} {
-	encode gzip
+	encode zstd gzip
 
-	# API del backend (FastAPI)
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+		# HSTS: activar solo con un dominio real (con localhost queda fijado en el navegador).
+		# Strict-Transport-Security "max-age=31536000"
+	}
+
+	# API (FastAPI). El límite real de imagen es MAX_IMAGE_MB (413 desde el backend);
+	# este tope solo corta antes los cuerpos desmedidos.
 	handle /skin/* {
 		request_body {
 			max_size 15MB
@@ -10,9 +21,17 @@
 		reverse_proxy backend:8080
 	}
 
-	# Frontend (SPA con BrowserRouter: toda ruta desconocida vuelve a index.html)
+	# Frontend: SPA con BrowserRouter, toda ruta desconocida vuelve a index.html.
 	handle {
 		root * /srv
+
+		# Los assets de Vite llevan hash en el nombre: caché larga.
+		# El resto (index.html y las rutas de la SPA) se revalida, así un deploy se ve enseguida.
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@noAssets not path /assets/*
+		header @noAssets Cache-Control "no-cache"
+
 		try_files {path} /index.html
 		file_server
 	}

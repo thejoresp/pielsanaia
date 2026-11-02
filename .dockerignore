@@ -10,3 +10,5 @@ venv/
 *.keras
 *.pem
 pipelineModelos/
+backend/tests/
+pytest.ini

@@ -44,6 +44,7 @@ docker compose up -d --build          # .env en la raíz (plantilla .env.example
 - Nada bloqueante dentro de `async def`: el LLM va con `await` y `model.predict` con `run_in_threadpool`.
 - Dependencias fijadas en `requirements.txt` según `pip freeze` en `python:3.10-slim`; al actualizarlas, resolver en esa imagen (varias libs nuevas ya exigen Python ≥3.11).
 - El backend recibe en compose solo sus variables (`environment:`), no el `.env` entero. Si se agrega una variable nueva, sumarla ahí. Las vacías toman el default del código: leer con `os.getenv("X") or "default"`, no con `os.getenv("X", "default")`.
+- Repo y carpeta: `pielsanaia` (antes `PielSanaIA-MVP`). `docker-compose.yml` fija `name: pielsanaia`, así el proyecto Compose (volúmenes `pielsanaia_caddy_*`) no depende del nombre de la carpeta. Migración de una VPS vieja: README → "Migrar una VPS existente".
 - uvicorn corre con `--proxy-headers` para que el rate limit vea la IP real detrás de Caddy.
 - El build del front es `tsc -b && vite build`: un error de tipos rompe el Docker build.
 

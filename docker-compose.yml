@@ -1,6 +1,8 @@
 # PielSana IA - despliegue en VPS (Contabo + DuckDNS)
 # Uso: cp .env.example .env  (completar)  &&  docker compose up -d --build
 
+name: pielsanaia   # nombre fijo del proyecto Compose (no depende de la carpeta)
+
 services:
   backend:
     build:

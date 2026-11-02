@@ -106,7 +106,7 @@ Se usa de dos maneras:
 ## Estructura del Monorepo
 
 ```
-PielSanaIA-MVP/
+pielsanaia/
 ├── frontend/                  ← React + Vite (SPA)
 │   ├── src/
 │   │   ├── components/        ← Navbar, ImageUploader, ConditionsOverview...
@@ -227,22 +227,35 @@ Toda la app (frontend + backend) corre en una VPS con Docker Compose, bajo `http
 2. **Preparar la VPS** (como root, una sola vez): instala Docker, crea el usuario `deploy`, configura el firewall (22/80/443), agrega swap y clona el repo.
    ```bash
    ssh root@IP_VPS
-   curl -fsSL https://raw.githubusercontent.com/thejoresp/PielSanaIA-MVP/main/deploy/setup-vps.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/thejoresp/pielsanaia/main/deploy/setup-vps.sh | bash
    ```
    > Si entrás a root con contraseña (sin clave SSH), el usuario `deploy` no va a tener acceso por SSH. Antes de seguir, desde tu máquina corré `ssh-copy-id root@IP_VPS` y volvé a ejecutar el script, o usá `su - deploy` desde root.
-3. **Variables de entorno:** `nano /home/deploy/PielSanaIA-MVP/.env` → `DOMAIN`, `DUCKDNS_SUBDOMAIN`, `DUCKDNS_TOKEN`, `DEEPSEEK_API_KEY`, `ALLOWED_ORIGINS`.
+3. **Variables de entorno:** `nano /home/deploy/pielsanaia/.env` → `DOMAIN`, `DUCKDNS_SUBDOMAIN`, `DUCKDNS_TOKEN`, `DEEPSEEK_API_KEY`, `ALLOWED_ORIGINS`.
 4. **Subir los modelos** (no están en el repo), desde tu máquina:
    ```bash
-   scp lunares.keras deploy@IP_VPS:~/PielSanaIA-MVP/backend/modelos/ham10000/
-   scp acne.keras    deploy@IP_VPS:~/PielSanaIA-MVP/backend/modelos/acne/
-   scp rosacea.keras deploy@IP_VPS:~/PielSanaIA-MVP/backend/modelos/rosacea/
+   scp lunares.keras deploy@IP_VPS:~/pielsanaia/backend/modelos/ham10000/
+   scp acne.keras    deploy@IP_VPS:~/pielsanaia/backend/modelos/acne/
+   scp rosacea.keras deploy@IP_VPS:~/pielsanaia/backend/modelos/rosacea/
    ```
 5. **Levantar:**
    ```bash
    ssh deploy@IP_VPS
-   cd PielSanaIA-MVP && docker compose up -d --build
+   cd pielsanaia && docker compose up -d --build
    ```
 6. **Actualizar** después de un `git push`: `./deploy/deploy.sh` en la VPS.
+
+### Migrar una VPS existente (clonada como `PielSanaIA-MVP`)
+
+El repo pasó a llamarse `pielsanaia` y el proyecto Compose tiene nombre fijo (`name: pielsanaia`). Una VPS clonada con el nombre viejo se migra una sola vez:
+
+```bash
+cd ~/PielSanaIA-MVP && docker compose down
+cd ~ && mv PielSanaIA-MVP pielsanaia && cd pielsanaia
+git remote set-url origin https://github.com/thejoresp/pielsanaia.git
+git pull --ff-only && docker compose up -d --build
+docker compose ps                     # backend "(healthy)"; Caddy vuelve a emitir el certificado
+docker volume rm pielsanaia-mvp_caddy_data pielsanaia-mvp_caddy_config   # opcional, volúmenes viejos
+```
 
 ### Comprobar
 

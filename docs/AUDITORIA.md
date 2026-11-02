@@ -128,3 +128,12 @@ Las imágenes se construyeron con `docker build` y se probaron de punta a punta 
 - [ ] 🟠 **npm audit: 24 vulnerabilidades (16 altas)**, todas con arreglo. Directas: `vite`, `postcss`, `react-router-dom` (esta última llega al build). Revisar saltos de versión mayor. GitHub (Dependabot) informa 53 alertas.
 - [ ] 🟢 **Carga lazy de modelos sin lock:** dos requests simultáneos en el threadpool pueden cargar el mismo `.keras` dos veces → `threading.Lock` en `load_*_model`.
 - [ ] 🟢 **Imagen del backend de 3,73 GB**, casi todo TensorFlow → evaluar `tensorflow-cpu`.
+
+## 5. Renombre del proyecto (2026-11-02)
+
+`PielSanaIA-MVP` → `pielsanaia`. El nombre solo aparecía en `README.md` (7 veces) y `deploy/setup-vps.sh` (4: `REPO_URL`, `APP_DIR`, comentario y mensaje); el código y el resto de la config no lo usaban. Riesgo detectado: el nombre del proyecto Compose salía de la carpeta (`pielsanaia-mvp`), así que renombrar la carpeta en la VPS chocaba con los `container_name` fijos y dejaba vacíos los volúmenes de Caddy. Se fijó `name: pielsanaia` en `docker-compose.yml` y se documentó la migración (`down` → `mv` → `up`) en el README.
+
+- [x] Referencias en `README.md` y `deploy/setup-vps.sh`.
+- [x] `name: pielsanaia` en `docker-compose.yml`.
+- [ ] Manual: renombrar el repo en GitHub, `git remote set-url` (local y VPS) y migrar la carpeta de la VPS.
+- Quedan como están: `"name": "dermascan-skin-analysis"` en `frontend/package.json`, `container_name: pielsana-*` y la marca visible "PielSana IA".

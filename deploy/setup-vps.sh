@@ -1,13 +1,13 @@
 #!/bin/bash
 # Preparación inicial de una VPS Contabo (Ubuntu 22.04/24.04) para PielSana IA.
 # Ejecutar UNA vez como root:
-#   curl -fsSL https://raw.githubusercontent.com/thejoresp/PielSanaIA-MVP/main/deploy/setup-vps.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/thejoresp/pielsanaia/main/deploy/setup-vps.sh | bash
 #   (o copiarlo con scp y correr: sudo bash setup-vps.sh)
 set -euo pipefail
 
-REPO_URL="${REPO_URL:-https://github.com/thejoresp/PielSanaIA-MVP.git}"
+REPO_URL="${REPO_URL:-https://github.com/thejoresp/pielsanaia.git}"
 APP_USER="${APP_USER:-deploy}"
-APP_DIR="/home/${APP_USER}/PielSanaIA-MVP"
+APP_DIR="/home/${APP_USER}/pielsanaia"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Ejecutar como root (sudo bash setup-vps.sh)"; exit 1
@@ -71,4 +71,4 @@ echo
 echo "Listo. Próximos pasos:"
 echo "  1) Completar ${APP_DIR}/.env (DOMAIN, DUCKDNS_*, DEEPSEEK_API_KEY)"
 echo "  2) Subir los modelos .keras a ${APP_DIR}/backend/modelos/{ham10000,acne,rosacea}/"
-echo "  3) su - ${APP_USER} && cd PielSanaIA-MVP && docker compose up -d --build"
+echo "  3) su - ${APP_USER} && cd pielsanaia && docker compose up -d --build"

@@ -123,8 +123,8 @@ Medios y bajos de §1 y §2 resueltos (ver las tablas de pruebas abajo). Queda �
 
 Las imágenes se construyeron con `docker build` y se probaron de punta a punta detrás de Caddy (413, 429, 503, IP real con `--proxy-headers` y un `X-Forwarded-For` falso que no saltea el límite). A1–A8 quedan verificados. Estos hallazgos se dejan para después de cerrar los medios y bajos de §1 y §2:
 
-- [ ] 🔴 **Pillow 12.3.0: 39 vulnerabilidades conocidas** (`pip-audit`). Se corrigen en 13.0.0, que exige Python ≥3.11 → pasar `backend/Dockerfile` a `python:3.11-slim` (TF 2.19 soporta 3.9–3.12), re-resolver `requirements.txt` con `pip freeze` en esa imagen y actualizar la nota de Python 3.10 en `CLAUDE.md`. Es el más urgente: Pillow abre las imágenes que suben los usuarios.
-- [ ] 🟠 **Keras 3.12.4: 4 vulnerabilidades**, corregidas en 3.15.0 (vía tensorflow/keras). Riesgo menor: solo se cargan `.keras` propios. Hacerlo junto con el cambio de Python.
+- [x] 🔴 **Pillow 12.3.0: 39 vulnerabilidades conocidas** (`pip-audit`). Se corrigen en 13.0.0, que exige Python ≥3.11 → pasar `backend/Dockerfile` a `python:3.11-slim` (TF 2.19 soporta 3.9–3.12), re-resolver `requirements.txt` con `pip freeze` en esa imagen y actualizar la nota de Python 3.10 en `CLAUDE.md`. Es el más urgente: Pillow abre las imágenes que suben los usuarios.
+- [x] 🟠 **Keras 3.12.4: 4 vulnerabilidades**, corregidas en 3.15.0 (vía tensorflow/keras). Riesgo menor: solo se cargan `.keras` propios. Hacerlo junto con el cambio de Python.
 - [ ] 🟠 **npm audit: 24 vulnerabilidades (16 altas)**, todas con arreglo. Directas: `vite`, `postcss`, `react-router-dom` (esta última llega al build). Revisar saltos de versión mayor. GitHub (Dependabot) informa 53 alertas.
 - [ ] 🟢 **Carga lazy de modelos sin lock:** dos requests simultáneos en el threadpool pueden cargar el mismo `.keras` dos veces → `threading.Lock` en `load_*_model`.
 - [ ] 🟢 **Imagen del backend de 3,73 GB**, casi todo TensorFlow → evaluar `tensorflow-cpu`.
@@ -137,3 +137,36 @@ Las imágenes se construyeron con `docker build` y se probaron de punta a punta 
 - [x] `name: pielsanaia` en `docker-compose.yml`.
 - [ ] Manual: renombrar el repo en GitHub, `git remote set-url` (local y VPS) y migrar la carpeta de la VPS.
 - Quedan como están: `"name": "dermascan-skin-analysis"` en `frontend/package.json`, `container_name: pielsana-*` y la marca visible "PielSana IA".
+
+## 6. Infraestructura reescrita desde cero (2026-11-02)
+
+Se reescribieron desde cero `docker-compose.yml`, `backend/Dockerfile`, `deploy/web.Dockerfile`, `deploy/Caddyfile`, `.env.example`, `deploy/setup-vps.sh`, `deploy/deploy.sh` y `backend/config/model_config.py`, y el backend pasó a Python 3.11 (cierra Pillow y Keras de §4).
+
+| Archivo | Cambios principales |
+|---|---|
+| `backend/Dockerfile` | `python:3.11-slim`, sin `apt-get` (los paquetes de OpenCV no se usaban), usuario sin privilegios `app`, `pip install --upgrade pip setuptools`. Imagen: 3,73 GB → 3,26 GB |
+| `backend/requirements.txt` | Pillow 13.0.0, tensorflow 2.19.1, `keras==3.15.1` fijada |
+| `model_config.py` | `pathlib`, `os.getenv(X) or default`, sin `os.makedirs` (permite montar los modelos `:ro`) |
+| `web.Dockerfile` | `npm ci --no-audit --no-fund`, corta si falta `VITE_API_URL`, `caddy:2.11-alpine` fijado |
+| `Caddyfile` | `encode zstd gzip`, nosniff / X-Frame-Options / Referrer-Policy, sin `Server`, caché inmutable en `/assets/*` y `no-cache` en el resto |
+| `docker-compose.yml` | `x-comunes` (restart, `no-new-privileges`, logs 10m×3), sin `container_name`, modelos `:ro`, `DOMAIN`/`DUCKDNS_*` obligatorias con `:?` |
+| `.env.example` | obligatorias y opcionales separadas, nota para uso local |
+| `setup-vps.sh` | idempotente (no duplica la swap en `fstab`), `.env` con permisos 600, imprime los `scp` |
+| `deploy.sh` | corta si falta `.env`, `build` antes de `up -d` |
+
+### Pruebas
+
+| Prueba | Resultado |
+|---|---|
+| `pip check` / `pip-audit` en la imagen | sin conflictos / 0 vulnerabilidades |
+| `acne.keras` real (6 imágenes) vs. imagen anterior (Py 3.10, Keras 3.12.4) | mismas etiquetas, diferencia máxima 0.0 |
+| Usuario del contenedor | `app` |
+| Modelos faltantes con montaje `:ro` | la app importa; el endpoint responde 500 genérico, sin errores de sistema de archivos |
+| Build web sin `VITE_API_URL` / compose sin `DOMAIN` | fallan con "falta el build-arg VITE_API_URL" / "Falta DOMAIN en .env" |
+| Stack detrás de Caddy (`DOMAIN=localhost`) | backend `healthy`; SPA y `/results-*` 200; 413 con 6 MB; recomendaciones 503×3 → 429 |
+| Encabezados | `no-cache` en index, `immutable` en `/assets/*`, nosniff, DENY, Referrer-Policy, sin `Server` |
+| `docker inspect` | `RW=false` en modelos, logs `max-size 10m / max-file 3`, `no-new-privileges` |
+| `bash -n` + `shellcheck` | sin advertencias en `setup-vps.sh` y `deploy.sh` |
+
+- [ ] Manual, tras el deploy en la VPS: `docker compose exec backend python -c "from backend.services import skin_analysis_service as s; print([m() is not None for m in (s.load_lunares_model, s.load_acne_model, s.load_rosacea_model)])"` → `[True, True, True]` (lunares y rosacea no se pudieron probar localmente). Si falla: volver al commit anterior y `./deploy/deploy.sh`.
+- [ ] Migración de la VPS: README → "Migrar una VPS existente" (los contenedores pasan a `pielsanaia-*-1`).

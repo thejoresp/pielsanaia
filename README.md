@@ -96,7 +96,7 @@ Se usa de dos maneras:
 | Capa            | Tecnología                                          |
 |-----------------|-----------------------------------------------------|
 | Frontend        | React 18, Vite, TypeScript, TailwindCSS, React Router |
-| Backend         | Python 3.10, FastAPI, TensorFlow/Keras, SDK `openai` (apuntando a DeepSeek) |
+| Backend         | Python 3.11, FastAPI, TensorFlow/Keras, SDK `openai` (apuntando a DeepSeek) |
 | IA externa      | DeepSeek API (`deepseek-flash`)                      |
 | Modelos locales | `lunares.keras`, `acne.keras`, `rosacea.keras`       |
 | Infraestructura | Docker Compose, Caddy, DuckDNS, VPS Contabo          |
@@ -180,14 +180,14 @@ Si falta `DEEPSEEK_API_KEY` o DeepSeek no responde, los endpoints de IA devuelve
 
 ## Desarrollo local
 
-**Requisitos:** Python 3.10, Node.js 18+, y opcionalmente Docker.
+**Requisitos:** Python 3.11, Node.js 20, y opcionalmente Docker.
 
 ### Backend
 
 Se ejecuta **desde la raíz del repo**, porque los imports son `backend.*`:
 
 ```bash
-python3.10 -m venv venv
+python3.11 -m venv venv
 source venv/bin/activate
 pip install -r backend/requirements.txt
 cp .env.example .env          # completar DEEPSEEK_API_KEY
@@ -211,8 +211,8 @@ La interfaz queda en http://localhost:5173.
 ### Todo junto con Docker (igual que en producción)
 
 ```bash
-cp .env.example .env    # poné DOMAIN=localhost
-docker compose up --build
+cp .env.example .env    # poné DOMAIN=localhost y cualquier valor en DUCKDNS_*
+docker compose up --build backend web   # sin duckdns
 ```
 
 Abrí https://localhost. Caddy usa un certificado local, así que el navegador va a mostrar una advertencia la primera vez.
@@ -246,7 +246,7 @@ Toda la app (frontend + backend) corre en una VPS con Docker Compose, bajo `http
 
 ### Migrar una VPS existente (clonada como `PielSanaIA-MVP`)
 
-El repo pasó a llamarse `pielsanaia` y el proyecto Compose tiene nombre fijo (`name: pielsanaia`). Una VPS clonada con el nombre viejo se migra una sola vez:
+El repo pasó a llamarse `pielsanaia` y el proyecto Compose tiene nombre fijo (`name: pielsanaia`). Los contenedores ya no tienen nombre fijo: ahora son `pielsanaia-backend-1`, `pielsanaia-web-1` y `pielsanaia-duckdns-1`. Una VPS clonada con el nombre viejo se migra una sola vez (el `down` va primero, con el compose viejo):
 
 ```bash
 cd ~/PielSanaIA-MVP && docker compose down
@@ -260,7 +260,7 @@ docker volume rm pielsanaia-mvp_caddy_data pielsanaia-mvp_caddy_config   # opcio
 ### Comprobar
 
 ```bash
-docker compose ps                     # 3 servicios en "running"; backend "(healthy)" tras ~1 min
+docker compose ps                     # pielsanaia-{backend,web,duckdns}-1 en "running"; backend "(healthy)" tras ~1 min
 docker compose logs -f web            # emisión del certificado
 docker compose logs -f backend        # errores de la API / carga de modelos
 curl -I https://<sub>.duckdns.org/          # el front responde 200
